@@ -23,12 +23,17 @@ import com.google.common.eventbus.Subscribe;
 import java.awt.Font;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.awt.event.ItemEvent;
+import java.awt.event.ItemListener;
 import java.awt.geom.Point2D;
 import java.text.ParseException;
+import java.util.Timer;
+import java.util.TimerTask;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import javax.swing.BorderFactory;
 import javax.swing.JButton;
+import javax.swing.JCheckBox;
 import javax.swing.JComboBox;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
@@ -70,6 +75,7 @@ public final class StageControlFrame extends MMFrame {
    private static final String SMALLMOVEMENTZ = "SMALLMOVEMENTZ";
    private static final String MEDIUMMOVEMENTZ = "MEDIUMMOVEMENTZ";
    private static final String CURRENTZDRIVE = "CURRENTZDRIVE";
+   private static final String REFRESH = "REFRESH";
 
    private static StageControlFrame staticFrame_;
 
@@ -77,8 +83,11 @@ public final class StageControlFrame extends MMFrame {
    private JPanel xyPanel_;
    private JLabel xyPositionLabel_;
    private JPanel zPanel_;
-   private JComboBox zDriveSelect_;
+   private JComboBox<String> zDriveSelect_;
    private JLabel zPositionLabel_;
+   private JPanel settingsPanel_;
+   private JCheckBox enableRefreshCB_;
+   private Timer timer_ = null;
    // Ordered small, medium, large.
    private JTextField[] xyStepTexts_ = new JTextField[] {
       new JTextField(), new JTextField(), new JTextField()
@@ -109,8 +118,8 @@ public final class StageControlFrame extends MMFrame {
       stageMotionExecutor_ = Executors.newFixedThreadPool(2);
 
       // Get active Z drive from profile
-      currentZDrive_ = studio_.getUserProfile().getString(this.getClass(),
-              CURRENTZDRIVE, currentZDrive_);
+      currentZDrive_ = studio_.profile().getSettings(StageControlFrame.class)
+            .getString(CURRENTZDRIVE, currentZDrive_);
 
       initComponents();
 
@@ -133,21 +142,24 @@ public final class StageControlFrame extends MMFrame {
       }
       // Read XY stepsizes from profile
       for (int i = 0; i < 3; ++i) {
-         xyStepSizes[i] = studio_.getUserProfile().getDouble(this.getClass(),
-               XY_MOVEMENTS[i], xyStepSizes[i]);
+         xyStepSizes[i] = studio_.profile().getSettings(StageControlFrame.class).
+               getDouble(XY_MOVEMENTS[i], xyStepSizes[i]);
          xyStepTexts_[i].setText(
                  NumberUtils.doubleToDisplayString(xyStepSizes[i]) );
       }
 
       StrVector zDrives = core_.getLoadedDevicesOfType(DeviceType.StageDevice);
       StrVector xyDrives = core_.getLoadedDevicesOfType(DeviceType.XYStageDevice);
+      final boolean haveXY = !xyDrives.isEmpty();
+      final boolean haveZ = !zDrives.isEmpty();
 
-      xyPanel_.setVisible(!xyDrives.isEmpty());
-      zPanel_.setVisible(!zDrives.isEmpty());
-      errorPanel_.setVisible(xyDrives.isEmpty() && zDrives.isEmpty());
+      xyPanel_.setVisible(haveXY);
+      zPanel_.setVisible(haveZ);
+      settingsPanel_.setVisible(haveXY || haveZ);
+      errorPanel_.setVisible(!haveXY && !haveZ);
 
       boolean zDriveFound = false;
-      if (!zDrives.isEmpty()) {
+      if (haveZ) {
          zDriveSelect_.setVisible(zDrives.size() > 1);
 
          if (zDriveSelect_.getItemCount() != 0) {
@@ -179,7 +191,7 @@ public final class StageControlFrame extends MMFrame {
 
       initialized_ = true;
 
-      if (xyDrives.size() != 0) {
+      if (haveXY) {
          try {
             getXYPosLabelFromCore();
          }
@@ -194,11 +206,11 @@ public final class StageControlFrame extends MMFrame {
    }
 
    private void updateZMovements() {
-      double smallMovement = studio_.profile().getDouble(StageControlFrame.class,
-              SMALLMOVEMENTZ + currentZDrive_, 1.0);
+      double smallMovement = studio_.profile().getSettings(StageControlFrame.class)
+            .getDouble(SMALLMOVEMENTZ + currentZDrive_, 1.0);
       zStepTexts_[0].setText(NumberUtils.doubleToDisplayString(smallMovement));
-      double mediumMovement = studio_.profile().getDouble(StageControlFrame.class,
-              MEDIUMMOVEMENTZ + currentZDrive_, 10.0);
+      double mediumMovement = studio_.profile().getSettings(StageControlFrame.class)
+            .getDouble(MEDIUMMOVEMENTZ + currentZDrive_, 10.0);
       zStepTexts_[1].setText(NumberUtils.doubleToDisplayString(mediumMovement));
    }
 
@@ -215,7 +227,10 @@ public final class StageControlFrame extends MMFrame {
       // several assumptions about the layout of the XY panel so that its
       // components are nicely vertically aligned.
       zPanel_ = createZPanel();
-      add(zPanel_, "aligny top, gapleft 20, hidemode 2");
+      add(zPanel_, "aligny top, gapleft 20, hidemode 2, flowy, split 2");
+      
+      settingsPanel_ = createSettingsPanel();
+      add(settingsPanel_, "center");
 
       errorPanel_ = createErrorPanel();
       add(errorPanel_, "grow, hidemode 2");
@@ -430,8 +445,8 @@ public final class StageControlFrame extends MMFrame {
       // Create the controls for setting the step size.
       // These heights again must match those of the corresponding stepsize
       // controls in the XY panel.
-      double size = studio_.profile().getDouble(StageControlFrame.class,
-               SMALLMOVEMENTZ + currentZDrive_, 1.0);
+      double size = studio_.profile().getSettings(StageControlFrame.class)
+               .getDouble(SMALLMOVEMENTZ + currentZDrive_, 1.0);
       
       zStepTexts_[0].setText(NumberUtils.doubleToDisplayString(size));
       result.add(new JLabel(IconLoader.getIcon("/org/micromanager/icons/stagecontrol/arrowhead-sr.png")),
@@ -439,8 +454,8 @@ public final class StageControlFrame extends MMFrame {
       result.add(zStepTexts_[0], "height 20!, width 50");
       result.add(new JLabel("\u00b5m"), "height 20!");
 
-      size = studio_.profile().getDouble(StageControlFrame.class,
-               MEDIUMMOVEMENTZ + currentZDrive_, 10.0);
+      size = studio_.profile().getSettings(StageControlFrame.class)
+               .getDouble(MEDIUMMOVEMENTZ + currentZDrive_, 10.0);
       zStepTexts_[1].setText(NumberUtils.doubleToDisplayString(size));
       result.add(new JLabel(IconLoader.getIcon("/org/micromanager/icons/stagecontrol/arrowhead-dr.png")),
             "span, split 3, flowx");
@@ -450,6 +465,77 @@ public final class StageControlFrame extends MMFrame {
       return result;
    }
 
+   private JPanel createSettingsPanel() {
+      JPanel result = new JPanel(new MigLayout("insets 0, gap 0, flowy"));
+      
+      // checkbox to turn updates on and off
+      enableRefreshCB_ = new JCheckBox("Polling updates");
+      enableRefreshCB_.addItemListener(new ItemListener() {
+         @Override
+         public void itemStateChanged(ItemEvent arg0) {
+            studio_.profile().getSettings(StageControlFrame.class)
+                  .putBoolean(REFRESH, enableRefreshCB_.isSelected());
+            refreshTimer();
+         }
+      });
+      enableRefreshCB_.setSelected(studio_.profile().getSettings(StageControlFrame.class)
+            .getBoolean(REFRESH, false));
+      result.add(enableRefreshCB_, "center");
+      return result;
+   }
+   
+   /**
+    * Starts the timer if updates are enabled, or stops it otherwise.
+    */
+   private void refreshTimer() {
+      if (enableRefreshCB_.isSelected()) {
+         startTimer();
+      } else {
+         stopTimer();
+      }
+   }
+   
+   /**
+    * Unconditionally starts the timer.
+    */
+   private void startTimer() {
+      // end any existing updater before starting (anew)
+      stopTimer();
+      timer_ = new Timer(true);
+      timer_.scheduleAtFixedRate(new TimerTask() {
+        @Override
+        public void run() {
+           // update positions if we aren't already doing it or paused
+           // this prevents building up task queue if something slows down
+           updateStagePositions();
+        }
+      }, 0, 1000);  // 1 sec interval
+   }
+   
+   /**
+    * Unconditionally stops the timer.
+    */
+   private void stopTimer() {
+      if (timer_ != null) {
+         timer_.cancel();
+      }
+   }
+   
+   private void updateStagePositions() {
+      try {
+         if (this.isVisible()) {  // don't update if stage control is hiddenh
+            if (xyPanel_.isVisible()) {
+               getXYPosLabelFromCore();
+            }
+            if (zPanel_.isVisible()) {
+               getZPosLabelFromCore();
+            }
+         }
+      } catch (Exception ex) {
+         studio_.logs().logError(ex);
+      }
+   }
+   
    private JPanel createErrorPanel() {
       // Provide a friendly message when there are no drives in the device list
       JLabel noDriveLabel = new javax.swing.JLabel(
@@ -467,14 +553,14 @@ public final class StageControlFrame extends MMFrame {
    private void storeZValuesInProfile() {
        try {
          double stepSize = NumberUtils.displayStringToDouble(zStepTexts_[0].getText());
-         studio_.profile().setDouble(StageControlFrame.class,
-                 SMALLMOVEMENTZ + currentZDrive_, stepSize);
+         studio_.profile().getSettings(StageControlFrame.class)
+               .putDouble(SMALLMOVEMENTZ + currentZDrive_, stepSize);
       } catch (ParseException pe) {// ignore, it would be annoying to ask for user input}
       } 
       try {
          double stepSize = NumberUtils.displayStringToDouble(zStepTexts_[1].getText());
-         studio_.profile().setDouble(StageControlFrame.class,
-                 MEDIUMMOVEMENTZ + currentZDrive_, stepSize);
+         studio_.profile().getSettings(StageControlFrame.class)
+               .putDouble(MEDIUMMOVEMENTZ + currentZDrive_, stepSize);
       } catch (ParseException pe) {// ignore, it would be annoying to ask for user input}
       }
    }
@@ -486,8 +572,8 @@ public final class StageControlFrame extends MMFrame {
       String curDrive = (String) zDriveSelect_.getSelectedItem();
       if (curDrive != null && initialized_) {
          currentZDrive_ = curDrive;
-         studio_.profile().setString(StageControlFrame.class,
-                 CURRENTZDRIVE, currentZDrive_);
+         studio_.profile().getSettings(StageControlFrame.class)
+               .putString(CURRENTZDRIVE, currentZDrive_);
          // Remember step sizes for this new drive.
          updateZMovements();
          try {
@@ -575,15 +661,14 @@ public final class StageControlFrame extends MMFrame {
    public void dispose() {
       for (int i = 0; i < 3; i++) {
          try {
-            studio_.profile().setDouble(StageControlFrame.class,
-                    XY_MOVEMENTS[i], 
-                    NumberUtils.displayStringToDouble(xyStepTexts_[i].getText()));
+            studio_.profile().getSettings(StageControlFrame.class)
+                  .putDouble(XY_MOVEMENTS[i], NumberUtils.displayStringToDouble(xyStepTexts_[i].getText()));
          } catch (ParseException pex) {
             // since we are closing, no need to warn the user
          }
       }
       storeZValuesInProfile();
-      
+      stopTimer();
       super.dispose();
    }
 
@@ -593,6 +678,7 @@ public final class StageControlFrame extends MMFrame {
       final double x_;
       final double y_;
       final double z_;
+      
       public StageThread(String device, double z) {
          device_ = device;
          z_ = z;
