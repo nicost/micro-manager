@@ -40,7 +40,9 @@
 
 
 #if defined(_MSC_VER) && _MSC_VER < 1900
-#define snprintf _snprintf
+#if _MSC_VER<1900
+    #define snprintf _snprintf
+#endif
 #endif
 
 const char* const MCP_CMD_TERM = "\r";

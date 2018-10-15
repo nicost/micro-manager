@@ -27,7 +27,9 @@
 using namespace std;
 
 #if WIN32
-   #define snprintf _snprintf
+   #if _MSC_VER<1900
+    #define snprintf _snprintf
+#endif
 #endif
 
 const int BUFSIZE = 60; // For number-to-string conversion

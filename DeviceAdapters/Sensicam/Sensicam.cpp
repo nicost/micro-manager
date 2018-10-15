@@ -52,7 +52,9 @@ const char* g_PixelType_8bit = "8bit";
 const char* g_PixelType_16bit = "16bit";
 
 #ifdef WIN32
-   #define snprintf _snprintf
+   #if _MSC_VER<1900
+    #define snprintf _snprintf
+#endif
 #endif
 
 ///////////////////////////////////////////////////////////////////////////////

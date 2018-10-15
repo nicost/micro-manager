@@ -24,7 +24,9 @@ limitations under the License.
 #ifdef WIN32
    #define WIN32_LEAN_AND_MEAN
    #include <windows.h>
-   #define snprintf _snprintf 
+   #if _MSC_VER<1900
+    #define snprintf _snprintf
+#endif 
 #endif
 
 const char* g_DeviceNameArduinoNeoPixelHub = "ArduinoNeoPixel-Hub";

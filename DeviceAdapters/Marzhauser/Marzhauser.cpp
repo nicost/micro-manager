@@ -33,7 +33,9 @@
 
 #ifdef WIN32
 //   #include <windows.h>
-#define snprintf _snprintf 
+#if _MSC_VER<1900
+    #define snprintf _snprintf
+#endif 
 #pragma warning(disable: 4355)
 #endif
 
@@ -1337,7 +1339,7 @@ int ZStage::Initialize()
    if ((Configuration_ & 0x0800) == 0x0800)
    {
 	  sequenceable_ = true;
-	  CPropertyAction* pAct = new CPropertyAction (this, &ZStage::OnSequence);
+	  pAct = new CPropertyAction (this, &ZStage::OnSequence);
 	  const char* spn = "Use Sequence";
 	  CreateProperty(spn, "No", MM::String, false, pAct);
       AddAllowedValue(spn, "No");

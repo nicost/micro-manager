@@ -27,7 +27,9 @@
 //                Thanks to Sophie Dumont, Mary Elting, and Michael Mohammadi
 
 #ifdef WIN32
-#define snprintf _snprintf 
+#if _MSC_VER<1900
+    #define snprintf _snprintf
+#endif 
 #pragma warning(disable: 4355)
 #endif
 
