@@ -456,12 +456,12 @@ public final class TileCreatorDlg extends MMDialog {
 
    private double[] getCenteredSize() throws TileCreatorException {
        double pixelSizeUm = getPixelSizeUm();
-      double imageSizeXUm = TileCreator.getImageSize(core_, pixelSizeUm)[0];
-      double imageSizeYUm = TileCreator.getImageSize(core_, pixelSizeUm)[1];
+      double imageSizeXUm = TileCreator.getImageSize(pixelSizeUm)[0];
+      double imageSizeYUm = TileCreator.getImageSize(pixelSizeUm)[1];
 
       double overlap = getOverlap();
-      double tileSizeXUm = TileCreator.getTileSize(core_, overlap, overlapUnit_, pixelSizeUm)[0];
-      double tileSizeYUm = TileCreator.getTileSize(core_, overlap, overlapUnit_, pixelSizeUm)[1];
+      double tileSizeXUm = TileCreator.getTileSize(overlap, overlapUnit_, pixelSizeUm)[0];
+      double tileSizeYUm = TileCreator.getTileSize(overlap, overlapUnit_, pixelSizeUm)[1];
 
       double overlapXUm = imageSizeXUm - tileSizeXUm;
       double overlapYUm = imageSizeYUm - tileSizeYUm;
@@ -479,8 +479,8 @@ public final class TileCreatorDlg extends MMDialog {
     */
    private void centerGridHere()  throws TileCreatorException {
        double pixelSizeUm = getPixelSizeUm();
-      double imageSizeXUm = TileCreator.getImageSize(core_, pixelSizeUm)[0];
-      double imageSizeYUm = TileCreator.getImageSize(core_, pixelSizeUm)[1];
+      double imageSizeXUm = TileCreator.getImageSize(pixelSizeUm)[0];
+      double imageSizeYUm = TileCreator.getImageSize(pixelSizeUm)[1];
 
       double [] centeredSize = getCenteredSize();
       if(centeredSize[0] == 0.0)
@@ -587,8 +587,6 @@ public final class TileCreatorDlg extends MMDialog {
            return;
         }
         prefix_ += 1;
-        final String xyStage = positionListDlg_.get2DAxis();
-        final String zStage = positionListDlg_.get1DAxis();
         double overlap = getOverlap();
         double pixelSizeUm;
         try{
@@ -597,7 +595,7 @@ public final class TileCreatorDlg extends MMDialog {
             ReportingUtils.showError(ex);
             return;
         }
-        PositionList posList = TileCreator.createTiles(core_, xyStage, zStage, overlap, overlapUnit_, endPosition_, pixelSizeUm, Integer.toString(prefix_));
+        PositionList posList = TileCreator.createTiles(overlap, overlapUnit_, endPosition_, pixelSizeUm, Integer.toString(prefix_));
         // Add to position list
         // Increment prefix for these positions
 
