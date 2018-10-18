@@ -67,6 +67,4 @@ class Region {
       numYImages = (int) Math.ceil(Math.abs(maxY - minY) / yStepSize) + 1; // +1 for fencepost problem
       return numYImages;
    }
-
-   }
 }
