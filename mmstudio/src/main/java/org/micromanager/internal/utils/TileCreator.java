@@ -317,4 +317,32 @@ public final class TileCreator {
 
         return new double[] {imageSizeXUm, imageSizeYUm};
    }
+    
+    static public PositionList boundingBox( PositionList positions) {
+      //returns the bounding box of the region as a MicroManager PositionList
+      //the first index is the min coordinates, the second is the max coordinates
+      MultiStagePosition minCoords;
+      MultiStagePosition maxCoords;
+      PositionList bBox = new PositionList();
+      MultiStagePosition startCoords = positions.getPosition(0);
+      String XYStage = startCoords.getDefaultXYStage();
+      String ZStage = startCoords.getDefaultZStage();
+      double minX = startCoords.getX();
+      double minY = startCoords.getY();
+      double Z = startCoords.getZ(); //don't worry about min and max of Z
+      double maxX = minX;
+      double maxY = minY;
+      for (int i = 1; i < positions.getNumberOfPositions(); i++) {
+         MultiStagePosition p = positions.getPosition(i);
+         minX = Math.min(p.getX(), minX);
+         minY = Math.min(p.getY(), minY);
+         maxX = Math.max(p.getX(), maxX);
+         maxY = Math.max(p.getY(), maxY);
+      }
+      minCoords = new MultiStagePosition(XYStage, minX, minY, ZStage, Z);
+      maxCoords = new MultiStagePosition(XYStage, maxX, maxY, ZStage, Z);
+      bBox.addPosition(minCoords);
+      bBox.addPosition(maxCoords);
+      return bBox;
+   }
 }

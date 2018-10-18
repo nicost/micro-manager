@@ -678,7 +678,7 @@ public class AcquireMultipleRegionsForm extends javax.swing.JFrame {
         PositionList bBox;
         MultiStagePosition center, minPos;
         r = rlm_.getRegion(AcquireList.getSelectedIndex());
-        bBox = r.boundingBox();
+        bBox = TileCreator.boundingBox(r.positions);
         center = r.center();
         minPos = bBox.getPosition(0);
        try {
@@ -711,7 +711,7 @@ public class AcquireMultipleRegionsForm extends javax.swing.JFrame {
         PositionList bBox;
         MultiStagePosition center, maxPos;
         r = rlm_.getRegion(AcquireList.getSelectedIndex());
-        bBox = r.boundingBox();
+        bBox = TileCreator.boundingBox(r.positions);
         center = r.center();
         maxPos = bBox.getPosition(1);
        try {
@@ -729,7 +729,7 @@ public class AcquireMultipleRegionsForm extends javax.swing.JFrame {
         MultiStagePosition center, minPos;
         index = AcquireList.getSelectedIndex();
         r = rlm_.getRegion(index);
-        bBox = r.boundingBox();
+        bBox = TileCreator.boundingBox(r.positions);
         center = r.center();
         minPos = bBox.getPosition(0);
        try {
@@ -745,7 +745,7 @@ public class AcquireMultipleRegionsForm extends javax.swing.JFrame {
         PositionList bBox;
         MultiStagePosition center, maxPos;
         r = rlm_.getRegion(AcquireList.getSelectedIndex());
-        bBox = r.boundingBox();
+        bBox = TileCreator.boundingBox(r.positions);
         center = r.center();
         maxPos = bBox.getPosition(1);
        try {

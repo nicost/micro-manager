@@ -1,11 +1,9 @@
 package org.micromanager.acquiremultipleregions;
 
 import java.io.File;
-import org.micromanager.acquiremultipleregions.AcquireMultipleRegionsForm.AxisList;
-import org.micromanager.acquiremultipleregions.ZGenerator.ZGeneratorType;
 import org.micromanager.MultiStagePosition;
 import org.micromanager.PositionList;
-import org.micromanager.StagePosition;
+import org.micromanager.internal.utils.TileCreator;
 
 /**
  *
@@ -32,39 +30,11 @@ class Region {
       return fullfile;
    }
 
-   public PositionList boundingBox() {
-      //returns the bounding box of the region as a MicroManager PositionList
-      //the first index is the min coordinates, the second is the max coordinates
-      MultiStagePosition minCoords;
-      MultiStagePosition maxCoords;
-      PositionList bBox = new PositionList();
-      MultiStagePosition startCoords = positions.getPosition(0);
-      String XYStage = startCoords.getDefaultXYStage();
-      String ZStage = startCoords.getDefaultZStage();
-      double minX = startCoords.getX();
-      double minY = startCoords.getY();
-      double Z = startCoords.getZ(); //don't worry about min and max of Z
-      double maxX = minX;
-      double maxY = minY;
-      for (int i = 1; i < positions.getNumberOfPositions(); i++) {
-         MultiStagePosition p = positions.getPosition(i);
-         minX = Math.min(p.getX(), minX);
-         minY = Math.min(p.getY(), minY);
-         maxX = Math.max(p.getX(), maxX);
-         maxY = Math.max(p.getY(), maxY);
-      }
-      minCoords = new MultiStagePosition(XYStage, minX, minY, ZStage, Z);
-      maxCoords = new MultiStagePosition(XYStage, maxX, maxY, ZStage, Z);
-      bBox.addPosition(minCoords);
-      bBox.addPosition(maxCoords);
-      return bBox;
-   }
-
    public MultiStagePosition center() {
       double centerX;
       double centerY;
       MultiStagePosition centerPos;
-      PositionList PL = boundingBox();
+      PositionList PL = TileCreator.boundingBox(positions);
       MultiStagePosition minCoords = PL.getPosition(0);
       MultiStagePosition maxCoords = PL.getPosition(1);
       centerX = (minCoords.getX() + maxCoords.getX()) / 2;
@@ -79,7 +49,7 @@ class Region {
       double minX, maxX;
       int numXImages;
 
-      bBox = this.boundingBox();
+      bBox = TileCreator.boundingBox(positions);
       minX = bBox.getPosition(0).getX();
       maxX = bBox.getPosition(1).getX();
       numXImages = (int) Math.ceil(Math.abs(maxX - minX) / xStepSize) + 1; // +1 for fencepost problem
@@ -91,95 +61,12 @@ class Region {
       double minY, maxY;
       int numYImages;
 
-      bBox = this.boundingBox();
+      bBox = TileCreator.boundingBox(positions);
       minY = bBox.getPosition(0).getY();
       maxY = bBox.getPosition(1).getY();
       numYImages = (int) Math.ceil(Math.abs(maxY - minY) / yStepSize) + 1; // +1 for fencepost problem
       return numYImages;
    }
 
-   /**
-    * Calculates a tiling grid of positions to cover the regions bounding box in
-    * steps of xStepSize and yStepSize. Positions for single axis stages are set
-    * to the mean value of those stages in the input coordinates
-    *
-    * @param xStepSize the step size in the X dimension
-    * @param yStepSize the step size in the Y dimension
-    * @param axisList 1-D axes to include
-    * @param zType type of ZGenerator to use (average, interpolate)
-    * @return a PositionList comprising the tiling positions
-    *
-    *
-    */
-   public PositionList tileGrid(double xStepSize, double yStepSize, AxisList axisList, ZGeneratorType zType) {
-      //generate tiling grid to cover bounding box in steps of xStepSize 
-      //and yStepSize
-      PositionList bBox, PL;
-      MultiStagePosition MSP0;
-      StagePosition SP, newSP;
-      double minX, maxX, minY;
-      int numXImages, numYImages;
-      ZGenerator zGen;
-
-      switch (zType) {
-
-         case SHEPINTERPOLATE:
-            zGen = new ZGeneratorShepard(positions, zType, AcquireMultipleRegions.shepardExponent);
-            break;
-
-         case AVERAGE:
-         default:
-            zGen = new ZGeneratorAverage(positions, zType);
-            break;
-      }
-
-      //should test ZGenerator and catch java.lang.IllegalStateException
-      //in case interpolator is set up with bad points (i.e. identical X Y with
-      //different Z
-      bBox = this.boundingBox();
-      minX = bBox.getPosition(0).getX();
-      minY = bBox.getPosition(0).getY();
-      numXImages = this.getNumXTiles(xStepSize);
-      numYImages = this.getNumYTiles(yStepSize);
-      //update maxX to cover an integer number of fields
-      maxX = minX + (numXImages - 1) * xStepSize;
-
-      MSP0 = positions.getPosition(0);
-
-      //initial conditions
-      double startX = minX;
-      double Y = minY;
-      double direction = 1;
-      PL = new PositionList();
-      for (int yidx = 0; yidx < numYImages; yidx++) {
-         for (int xidx = 0; xidx < numXImages; xidx++) {
-            double X = startX + direction * xidx * xStepSize;
-            newSP = StagePosition.create2D(MSP0.getDefaultXYStage(), X, Y);
-            MultiStagePosition MSP = new MultiStagePosition();
-            MSP.add(newSP);
-            //loop over Z coordinates and add the correct positions for any we are using
-            for (int a = 0; a < MSP0.size(); a++) {
-               SP = MSP0.get(a);
-               if (SP.is1DStagePosition() && axisList.use(SP.getStageDeviceLabel())) {
-                  newSP = StagePosition.create1D(SP.getStageDeviceLabel(), 
-                          zGen.getZ(X, Y, SP.getStageDeviceLabel()));
-                  MSP.add(newSP);
-               }
-            }
-                MSP.setLabel("Pos_" + String.format("%03d", xidx) + "_" + String.format("%03d", yidx));
-            PL.addPosition(MSP);
-         }
-         //Update Y coordinate
-         Y = Y + yStepSize;
-         //Acquire images by zig-zagging.
-         if (direction == 1) {
-            startX = maxX;
-            direction = -1;
-         } else {
-            startX = minX;
-            direction = 1;
-         }
-      }
-      return PL;
    }
 }
