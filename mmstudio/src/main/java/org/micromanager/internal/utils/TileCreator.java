@@ -3,18 +3,15 @@
  * To change this template file, choose Tools | Templates
  * and open the template in the editor.
  */
-package org.micromanager.internal.positionlist;
+package org.micromanager.internal.utils;
 
 import java.text.DecimalFormat;
-import java.text.ParseException;
 import javax.swing.JOptionPane;
 import mmcorej.CMMCore;
 import mmcorej.MMCoreJ;
 import org.micromanager.StagePosition;
 import org.micromanager.MultiStagePosition;
 import org.micromanager.PositionList;
-import org.micromanager.internal.utils.ReportingUtils;
-import org.micromanager.internal.utils.NumberUtils;
 
 /**
  *
