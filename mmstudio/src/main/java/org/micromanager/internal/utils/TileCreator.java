@@ -18,13 +18,17 @@ import org.micromanager.PositionList;
  * @author N2-LiveCell
  */
 public final class TileCreator {
+    private static CMMCore core_;
     static public enum OverlapUnitEnum {UM, PX, PERCENT};
     private static final DecimalFormat FMT_POS = new DecimalFormat("000");
    
+    public static void setCore(CMMCore core){
+        core_ = core;
+    }
     /*
     * Create the tile list based on user input, pixelsize, and imagesize
     */
-   static public PositionList createTiles(CMMCore core, String xyStage, String zStage, double overlap, OverlapUnitEnum overlapUnit, MultiStagePosition[] endPoints, double pixelSizeUm, String labelPrefix) {
+   static public PositionList createTiles(double overlap, OverlapUnitEnum overlapUnit, MultiStagePosition[] endPoints, double pixelSizeUm, String labelPrefix) {
          // Make sure at least two corners were set
          if (endPoints.length < 2) {
             ReportingUtils.showError("At least two corners should be set");
@@ -148,11 +152,11 @@ public final class TileCreator {
             zPlaneC = d / (-1 * c);
          }
 
-         double[] ans = getImageSize(core, pixelSizeUm);
+         double[] ans = getImageSize(pixelSizeUm);
          double imageSizeXUm = ans[0];
          double imageSizeYUm = ans[1];
 
-         ans = getTileSize(core, overlap, overlapUnit, pixelSizeUm);
+         ans = getTileSize(overlap, overlapUnit, pixelSizeUm);
          double tileSizeXUm = ans[0];
          double tileSizeYUm = ans[1];
 
@@ -235,22 +239,22 @@ public final class TileCreator {
         return posList;
     }
    
-    static private boolean isSwappedXY(CMMCore core) {
+    static private boolean isSwappedXY() {
         boolean correction, transposeXY, mirrorX, mirrorY;
-        String camera = core.getCameraDevice();
+        String camera = core_.getCameraDevice();
         if (camera == null) {
            JOptionPane.showMessageDialog(null, "This function does not work without a camera");
            return false;
         }
 
         try {
-           String tmp = core.getProperty(camera, "TransposeCorrection");
+           String tmp = core_.getProperty(camera, "TransposeCorrection");
            correction = !tmp.equals("0");
-           tmp = core.getProperty(camera, MMCoreJ.getG_Keyword_Transpose_MirrorX());
+           tmp = core_.getProperty(camera, MMCoreJ.getG_Keyword_Transpose_MirrorX());
            mirrorX = !tmp.equals("0");
-           tmp = core.getProperty(camera, MMCoreJ.getG_Keyword_Transpose_MirrorY());
+           tmp = core_.getProperty(camera, MMCoreJ.getG_Keyword_Transpose_MirrorY());
            mirrorY = !tmp.equals("0");
-           tmp = core.getProperty(camera, MMCoreJ.getG_Keyword_Transpose_SwapXY());
+           tmp = core_.getProperty(camera, MMCoreJ.getG_Keyword_Transpose_SwapXY());
            transposeXY = !tmp.equals("0");
         } catch (Exception exc) {
            ReportingUtils.showError(exc);
@@ -260,40 +264,40 @@ public final class TileCreator {
         return !correction && transposeXY;
     }
 
-    static public double[] getTileSize(CMMCore core, double overlap, OverlapUnitEnum overlapUnit, double pixSizeUm) {
+    static public double[] getTileSize(double overlap, OverlapUnitEnum overlapUnit, double pixSizeUm) {
         double overlapUmX;
         double overlapUmY;
 
         if(overlapUnit == OverlapUnitEnum.UM)
             overlapUmX = overlapUmY = overlap;
         else if(overlapUnit == OverlapUnitEnum.PERCENT) {
-            overlapUmX = pixSizeUm * (overlap / 100) * core.getImageWidth();
-            overlapUmY = pixSizeUm * (overlap / 100) * core.getImageHeight();
+            overlapUmX = pixSizeUm * (overlap / 100) * core_.getImageWidth();
+            overlapUmY = pixSizeUm * (overlap / 100) * core_.getImageHeight();
         } else { // overlapUnit_ == OverlapUnit.PX
             overlapUmX = overlap * pixSizeUm;
             overlapUmY = overlap * pixSizeUm;
         }
 
         // if camera does not correct image orientation, we'll correct for it here:
-        boolean swapXY = isSwappedXY(core);
+        boolean swapXY = isSwappedXY();
 
         double tileSizeXUm = swapXY ? 
-                             pixSizeUm * core.getImageHeight() - overlapUmY :
-                             pixSizeUm * core.getImageWidth() - overlapUmX;
+                             pixSizeUm * core_.getImageHeight() - overlapUmY :
+                             pixSizeUm * core_.getImageWidth() - overlapUmX;
 
         double tileSizeYUm = swapXY ? 
-                             pixSizeUm * core.getImageWidth() - overlapUmX :
-                             pixSizeUm * core.getImageHeight() - overlapUmY;
+                             pixSizeUm * core_.getImageWidth() - overlapUmX :
+                             pixSizeUm * core_.getImageHeight() - overlapUmY;
 
         return new double[] {tileSizeXUm, tileSizeYUm};
     }
 
-    static public double[] getImageSize(CMMCore core, double pixSizeUm) {     
-        boolean swapXY = isSwappedXY(core);
-        double imageSizeXUm = swapXY ? pixSizeUm * core.getImageHeight() : 
-                                       pixSizeUm * core.getImageWidth();
-        double imageSizeYUm = swapXY ? pixSizeUm * core.getImageWidth() :
-                                       pixSizeUm * core.getImageHeight();
+    static public double[] getImageSize(double pixSizeUm) {     
+        boolean swapXY = isSwappedXY();
+        double imageSizeXUm = swapXY ? pixSizeUm * core_.getImageHeight() : 
+                                       pixSizeUm * core_.getImageWidth();
+        double imageSizeYUm = swapXY ? pixSizeUm * core_.getImageWidth() :
+                                       pixSizeUm * core_.getImageHeight();
 
         return new double[] {imageSizeXUm, imageSizeYUm};
    }

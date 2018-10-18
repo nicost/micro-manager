@@ -21,7 +21,7 @@ import org.micromanager.PositionList;
 import org.micromanager.Studio;
 import org.micromanager.acquisition.SequenceSettings;
 import org.micromanager.StagePosition;
-import org.micromanager.internal.positionlist.TileCreator;
+import org.micromanager.internal.utils.TileCreator;
 import org.micromanager.internal.utils.FileDialogs;
 import org.micromanager.internal.utils.ReportingUtils;
 
