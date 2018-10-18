@@ -51,8 +51,6 @@ public final class TileCreator {
             ReportingUtils.showError("At least two corners should be set");
             return null;
          }
-         
-
 
          //Make sure all Points have the same stage
          String xyStage = endPoints[0].getDefaultXYStage();
@@ -72,32 +70,23 @@ public final class TileCreator {
                   
          // Calculate a bounding rectangle around the defaultXYStage positions
          // TODO: develop method to deal with multiple axis
-         double minX = Double.POSITIVE_INFINITY;
-         double minY = Double.POSITIVE_INFINITY;
-         double maxX = Double.NEGATIVE_INFINITY;
-         double maxY = Double.NEGATIVE_INFINITY;
+        PositionList bbox = boundingBox(endPoints);
+         double minX = bbox.getPosition(0).getX();
+         double minY = bbox.getPosition(0).getY();
+         double maxX = bbox.getPosition(1).getX();
+         double maxY = bbox.getPosition(1).getY();
+         
          double meanZ = 0.0;
-         StagePosition sp;
-         for (int i = 0; i < endPoints.length; i++) {
-            sp = endPoints[i].get(xyStage);
-            if (sp.x < minX) {
-               minX = sp.x;
-            }
-            if (sp.x > maxX) {
-               maxX = sp.x;
-            }
-            if (sp.y < minY) {
-               minY = sp.y;
-            }
-            if (sp.y > maxY) {
-               maxY = sp.y;
-            }
-            if (hasZPlane) {
+
+        StagePosition sp;
+        if (hasZPlane){
+            for (int i = 0; i < endPoints.length; i++) {
                sp = endPoints[i].get(zStage);
                meanZ += sp.x;
             }
          }
 
+        
          meanZ = meanZ / endPoints.length;
 
          // if there are at least three set points, use them to define a 
@@ -336,12 +325,16 @@ public final class TileCreator {
    }
     
     static public PositionList boundingBox( PositionList positions) {
-      //returns the bounding box of the region as a MicroManager PositionList
+        return boundingBox(positions.getPositions());
+    }
+    
+    static public PositionList boundingBox( MultiStagePosition[] positions){
+        //returns the bounding box of the region as a MicroManager PositionList
       //the first index is the min coordinates, the second is the max coordinates
       MultiStagePosition minCoords;
       MultiStagePosition maxCoords;
       PositionList bBox = new PositionList();
-      MultiStagePosition startCoords = positions.getPosition(0);
+      MultiStagePosition startCoords = positions[0];
       String XYStage = startCoords.getDefaultXYStage();
       String ZStage = startCoords.getDefaultZStage();
       double minX = startCoords.getX();
@@ -349,8 +342,8 @@ public final class TileCreator {
       double Z = startCoords.getZ(); //don't worry about min and max of Z
       double maxX = minX;
       double maxY = minY;
-      for (int i = 1; i < positions.getNumberOfPositions(); i++) {
-         MultiStagePosition p = positions.getPosition(i);
+      for (int i = 1; i < positions.length; i++) {
+         MultiStagePosition p = positions[i];
          minX = Math.min(p.getX(), minX);
          minY = Math.min(p.getY(), minY);
          maxX = Math.max(p.getX(), maxX);
