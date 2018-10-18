@@ -69,7 +69,6 @@ class Region {
       numYImages = (int) Math.ceil(Math.abs(maxY - minY) / yStepSize) + 1; // +1 for fencepost problem
       return numYImages;
    }
-   }
    
    public void save(Path path) {
        try{
@@ -91,4 +90,5 @@ class Region {
        String fname = f.getName();
        fname = fname.substring(0,fname.length()-4);
        return new Region(positions, newDir.toString() , fname);
+    }
 }
