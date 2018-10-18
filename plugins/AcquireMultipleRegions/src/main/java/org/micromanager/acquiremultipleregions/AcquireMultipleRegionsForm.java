@@ -34,6 +34,7 @@ import org.micromanager.internal.utils.ReportingUtils;
 public class AcquireMultipleRegionsForm extends javax.swing.JFrame {
    private final Studio gui_;
    private final mmcorej.CMMCore mmc_;
+   private final TileCreator tileCreator_;
    private final RegionListModel rlm_;
    private Region currentRegion_;
    private static final String MSG_PREFIX = "AcquireMultipleRegions: ";
@@ -50,6 +51,7 @@ public class AcquireMultipleRegionsForm extends javax.swing.JFrame {
         rlm_ = new RegionListModel();
         gui_ = gui;
         mmc_ = gui_.core();
+        tileCreator_ = new TileCreator(mmc_);
         initComponents();        
         currentRegion_ = new Region(new PositionList(), DirectoryText.getText(), FilenameText.getText());
       
@@ -247,7 +249,7 @@ public class AcquireMultipleRegionsForm extends javax.swing.JFrame {
                 double overlap = Double.parseDouble(overlapText.getText());
                 double pixelSizeUm = mmc_.getPixelSizeUm();
                 gui_.positions().setPositionList(
-                    TileCreator.createTiles(
+                    tileCreator_.createTiles(
                         overlap,
                         TileCreator.OverlapUnitEnum.PERCENT,
                         currRegion.positions.getPositions(),

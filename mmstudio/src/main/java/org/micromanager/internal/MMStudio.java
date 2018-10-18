@@ -112,7 +112,6 @@ import org.micromanager.profile.internal.UserProfileAdmin;
 import org.micromanager.profile.internal.gui.HardwareConfigurationManager;
 import org.micromanager.quickaccess.QuickAccessManager;
 import org.micromanager.quickaccess.internal.DefaultQuickAccessManager;
-import org.micromanager.internal.utils.TileCreator;
 
 
 /*
@@ -415,8 +414,6 @@ public final class MMStudio implements Studio, CompatibilityInterface, PositionL
       // reference to it.
       // new UiMovesStageManager(this, core_);
 
-      TileCreator.setCore(core_);
-      
       snapLiveManager_ = new SnapLiveManager(this, core_);
       events().registerForEvents(snapLiveManager_);
 

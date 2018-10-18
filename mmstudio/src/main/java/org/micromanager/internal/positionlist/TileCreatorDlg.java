@@ -49,6 +49,7 @@ public final class TileCreatorDlg extends MMDialog {
    private static final long serialVersionUID = 1L;
    private final CMMCore core_;
    private final Studio studio_;
+   private final TileCreator tileCreator_;
    private MultiStagePosition[] endPosition_;
    private boolean[] endPositionSet_;
    private PositionListDlg positionListDlg_;
@@ -85,6 +86,7 @@ public final class TileCreatorDlg extends MMDialog {
       
       core_ = core;
       studio_ = studio;
+      tileCreator_ = new TileCreator(core_);
       positionListDlg_ = positionListDlg;   
       positionListDlg_.activateAxisTable(false);
       endPosition_ = new MultiStagePosition[4];
@@ -456,12 +458,12 @@ public final class TileCreatorDlg extends MMDialog {
 
    private double[] getCenteredSize() throws TileCreatorException {
        double pixelSizeUm = getPixelSizeUm();
-      double imageSizeXUm = TileCreator.getImageSize(pixelSizeUm)[0];
-      double imageSizeYUm = TileCreator.getImageSize(pixelSizeUm)[1];
+      double imageSizeXUm = tileCreator_.getImageSize(pixelSizeUm)[0];
+      double imageSizeYUm = tileCreator_.getImageSize(pixelSizeUm)[1];
 
       double overlap = getOverlap();
-      double tileSizeXUm = TileCreator.getTileSize(overlap, overlapUnit_, pixelSizeUm)[0];
-      double tileSizeYUm = TileCreator.getTileSize(overlap, overlapUnit_, pixelSizeUm)[1];
+      double tileSizeXUm = tileCreator_.getTileSize(overlap, overlapUnit_, pixelSizeUm)[0];
+      double tileSizeYUm = tileCreator_.getTileSize(overlap, overlapUnit_, pixelSizeUm)[1];
 
       double overlapXUm = imageSizeXUm - tileSizeXUm;
       double overlapYUm = imageSizeYUm - tileSizeYUm;
@@ -479,8 +481,8 @@ public final class TileCreatorDlg extends MMDialog {
     */
    private void centerGridHere()  throws TileCreatorException {
        double pixelSizeUm = getPixelSizeUm();
-      double imageSizeXUm = TileCreator.getImageSize(pixelSizeUm)[0];
-      double imageSizeYUm = TileCreator.getImageSize(pixelSizeUm)[1];
+      double imageSizeXUm = tileCreator_.getImageSize(pixelSizeUm)[0];
+      double imageSizeYUm = tileCreator_.getImageSize(pixelSizeUm)[1];
 
       double [] centeredSize = getCenteredSize();
       if(centeredSize[0] == 0.0)
@@ -595,7 +597,7 @@ public final class TileCreatorDlg extends MMDialog {
             ReportingUtils.showError(ex);
             return;
         }
-        PositionList posList = TileCreator.createTiles(overlap, overlapUnit_, endPosition_, pixelSizeUm, Integer.toString(prefix_));
+        PositionList posList = tileCreator_.createTiles(overlap, overlapUnit_, endPosition_, pixelSizeUm, Integer.toString(prefix_));
         // Add to position list
         // Increment prefix for these positions
         MultiStagePosition[] msps = posList.getPositions();

@@ -39,13 +39,13 @@ public final class TileCreator {
     static public enum OverlapUnitEnum {UM, PX, PERCENT};
     private static final DecimalFormat FMT_POS = new DecimalFormat("000");
    
-    public static void setCore(CMMCore core){
+    public TileCreator(CMMCore core){
         core_ = core;
     }
     /*
     * Create the tile list based on user input, pixelsize, and imagesize
     */
-   static public PositionList createTiles(double overlap, OverlapUnitEnum overlapUnit, MultiStagePosition[] endPoints, double pixelSizeUm, String labelPrefix) {
+    public PositionList createTiles(double overlap, OverlapUnitEnum overlapUnit, MultiStagePosition[] endPoints, double pixelSizeUm, String labelPrefix) {
          // Make sure at least two corners were set
          if (endPoints.length < 2) {
             ReportingUtils.showError("At least two corners should be set");
@@ -272,7 +272,7 @@ public final class TileCreator {
         return posList;
     }
    
-    static private boolean isSwappedXY() {
+    private boolean isSwappedXY() {
         boolean correction, transposeXY, mirrorX, mirrorY;
         String camera = core_.getCameraDevice();
         if (camera == null) {
@@ -297,7 +297,7 @@ public final class TileCreator {
         return !correction && transposeXY;
     }
 
-    static public double[] getTileSize(double overlap, OverlapUnitEnum overlapUnit, double pixSizeUm) {
+    public double[] getTileSize(double overlap, OverlapUnitEnum overlapUnit, double pixSizeUm) {
         double overlapUmX;
         double overlapUmY;
 
@@ -325,7 +325,7 @@ public final class TileCreator {
         return new double[] {tileSizeXUm, tileSizeYUm};
     }
 
-    static public double[] getImageSize(double pixSizeUm) {     
+    public double[] getImageSize(double pixSizeUm) {     
         boolean swapXY = isSwappedXY();
         double imageSizeXUm = swapXY ? pixSizeUm * core_.getImageHeight() : 
                                        pixSizeUm * core_.getImageWidth();
