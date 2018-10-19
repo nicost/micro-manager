@@ -36,7 +36,7 @@ class Region {
       double centerX;
       double centerY;
       MultiStagePosition centerPos;
-      PositionList PL = TileCreator.boundingBox(positions);
+      PositionList PL = boundingBox();
       MultiStagePosition minCoords = PL.getPosition(0);
       MultiStagePosition maxCoords = PL.getPosition(1);
       centerX = (minCoords.getX() + maxCoords.getX()) / 2;
@@ -51,7 +51,7 @@ class Region {
       double minX, maxX;
       int numXImages;
 
-      bBox = TileCreator.boundingBox(positions);
+      bBox = boundingBox();
       minX = bBox.getPosition(0).getX();
       maxX = bBox.getPosition(1).getX();
       numXImages = (int) Math.ceil(Math.abs(maxX - minX) / xStepSize) + 1; // +1 for fencepost problem
@@ -63,7 +63,7 @@ class Region {
       double minY, maxY;
       int numYImages;
 
-      bBox = TileCreator.boundingBox(positions);
+      bBox = boundingBox();
       minY = bBox.getPosition(0).getY();
       maxY = bBox.getPosition(1).getY();
       numYImages = (int) Math.ceil(Math.abs(maxY - minY) / yStepSize) + 1; // +1 for fencepost problem
@@ -91,4 +91,32 @@ class Region {
        fname = fname.substring(0,fname.length()-4);
        return new Region(positions, newDir.toString() , fname);
     }
+       
+    public PositionList boundingBox() {
+      //returns the bounding box of the region as a MicroManager PositionList
+      //the first index is the min coordinates, the second is the max coordinates
+      MultiStagePosition minCoords;
+      MultiStagePosition maxCoords;
+      PositionList bBox = new PositionList();
+      MultiStagePosition startCoords = positions.getPosition(0);
+      String XYStage = startCoords.getDefaultXYStage();
+      String ZStage = startCoords.getDefaultZStage();
+      double minX = startCoords.getX();
+      double minY = startCoords.getY();
+      double Z = startCoords.getZ(); //don't worry about min and max of Z
+      double maxX = minX;
+      double maxY = minY;
+      for (int i = 1; i < positions.getNumberOfPositions(); i++) {
+         MultiStagePosition p = positions.getPosition(i);
+         minX = Math.min(p.getX(), minX);
+         minY = Math.min(p.getY(), minY);
+         maxX = Math.max(p.getX(), maxX);
+         maxY = Math.max(p.getY(), maxY);
+      }
+      minCoords = new MultiStagePosition(XYStage, minX, minY, ZStage, Z);
+      maxCoords = new MultiStagePosition(XYStage, maxX, maxY, ZStage, Z);
+      bBox.addPosition(minCoords);
+      bBox.addPosition(maxCoords);
+      return bBox;
+   }
 }
