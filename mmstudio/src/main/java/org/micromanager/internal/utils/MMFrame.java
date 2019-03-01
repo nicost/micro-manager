@@ -35,13 +35,14 @@ import org.micromanager.internal.MMStudio;
 import org.micromanager.internal.menus.MMMenuBar;
 import org.micromanager.propertymap.MutablePropertyMapView;
 import java.awt.event.WindowEvent;
-import java.awt.event.WindowFocusListener;  
+import java.awt.event.WindowFocusListener;
+import java.awt.event.WindowStateListener;
 import java.util.ArrayList;
 /**
  * Base class for Micro-Manager frame windows.
  * Saves and restores window size and position. 
  */
-public class MMFrame extends JFrame implements WindowFocusListener {
+public class MMFrame extends JFrame implements WindowFocusListener, WindowStateListener {
    private static final long serialVersionUID = 1L;
    private final String profileKey_;
    private static ArrayList<MMFrame> applicationFrames = new ArrayList<MMFrame>();
@@ -59,6 +60,7 @@ public class MMFrame extends JFrame implements WindowFocusListener {
       super.setIconImage(Toolkit.getDefaultToolkit().getImage(
         getClass().getResource("/org/micromanager/icons/microscope.gif")));
       addWindowFocusListener(this);
+      addWindowStateListener(this);
    }
 
    public MMFrame(String profileKeyForSavingBounds) {
@@ -68,6 +70,8 @@ public class MMFrame extends JFrame implements WindowFocusListener {
       super.setIconImage(Toolkit.getDefaultToolkit().getImage(
         getClass().getResource("/org/micromanager/icons/microscope.gif")));
       addWindowFocusListener(this);
+      addWindowStateListener(this);
+
    }
 
    /**
@@ -84,6 +88,8 @@ public class MMFrame extends JFrame implements WindowFocusListener {
       super.setIconImage(Toolkit.getDefaultToolkit().getImage(
         getClass().getResource("/org/micromanager/icons/microscope.gif")));
       addWindowFocusListener(this);
+      addWindowStateListener(this);
+
    }
 
    /**
@@ -229,4 +235,15 @@ public class MMFrame extends JFrame implements WindowFocusListener {
    }
    @Override
    public void windowLostFocus(WindowEvent e) {}
+   
+    @Override
+    public void windowStateChanged(WindowEvent e) {
+        if ((e.getNewState() == MMFrame.NORMAL) && (e.getOldState() == MMFrame.ICONIFIED)) {
+            for (MMFrame frame : applicationFrames) {
+                if (frame.getState() == MMFrame.ICONIFIED) {
+                    frame.setState(MMFrame.NORMAL);
+                }
+            }
+        }
+    }
 }
