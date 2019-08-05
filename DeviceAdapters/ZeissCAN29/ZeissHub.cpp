@@ -114,6 +114,27 @@ int ZeissHub::Initialize(MM::Device& device, MM::Core& core)
 {
    if (!portInitialized_)
       return ERR_PORT_NOT_OPEN;
+      const int commandLength = 5;
+   
+   // Send a command to initialize an Axio Imager.A2. A bit of a hack, but the microscope responds incorrectly without it.
+   unsigned char command[16];
+   command[0] = 0x10;
+   command[1] = 0x02;
+   command[2] = 0x1B;
+   command[3] = 0x10;
+   command[4] = 0x10;
+   command[5] = 0x05;
+   command[6] = 0x19;
+   command[7] = 0xA1;
+   command[8] = 0x10;
+   command[9] = 0x10;
+   command[10] = 0x01;
+   command[11] = 0x1D;
+   command[12] = 0x00;
+   command[13] = 0x02;
+   command[14] = 0x10;
+   command[15] = 0x03;
+   core.WriteToSerial(&device, port_.c_str(), &(command[0]), (unsigned long)16);
    
    std::ostringstream os;
    os << "Initializing Hub";
