@@ -60,7 +60,8 @@ public class DataExporter {
     * @param msLimit
     * @return 
     */
-   public FitData fit(int index, Type type, Class fitFunction, Integer msLimit) {
+   public FitData fit(int index, Type type, Class fitFunction, Integer msLimit) throws RuntimeException
+   {
       PASData d = data_.get(index);
       if (d == null) {
          return null; // TODO: throw error?
@@ -226,18 +227,18 @@ public class DataExporter {
          PASData d = data_.get(index);
          if (d != null) {
             try {
-            export.append(d.dataSetName()).append("\t").append(d.id()).append("\t");
-            double avgPSize = TrackInfoCalculator.avgParticleSize(d);
-            export.append(avgPSize).append("\t");
-            FitData fitData = fit(index, Type.BLEACH, SingleExpRecoveryFunc.class, null);
-            export.append(fitData.parms()[2]).append("\t");  // k
-            export.append(fitData.parms()[0]).append("\t");  // A
-            export.append(fitData.tHalf()).append("\t");
-            export.append(fitData.rSquared()).append("\t");
-            FitData particleFitData = fit(index, Type.PARTICLE_AND_BLEACH, LinearFunc.class, MSLIMIT);
-            export.append(particleFitData.parms()[1]).append("\t"); // particle k
-            export.append(particleFitData.parms()[0]).append("\n"); // particle y0:w
-            
+               export.append(d.dataSetName()).append("\t").append(d.id()).append("\t");
+               double avgPSize = TrackInfoCalculator.avgParticleSize(d);
+               export.append(avgPSize).append("\t");
+               FitData fitData = fit(index, Type.BLEACH, SingleExpRecoveryFunc.class, null);
+               export.append(fitData.parms()[2]).append("\t");  // k
+               export.append(fitData.parms()[0]).append("\t");  // A
+               export.append(fitData.tHalf()).append("\t");
+               export.append(fitData.rSquared()).append("\t");
+               FitData particleFitData = fit(index, Type.PARTICLE_AND_BLEACH, LinearFunc.class, MSLIMIT);
+               export.append(particleFitData.parms()[1]).append("\t"); // particle k
+               export.append(particleFitData.parms()[0]).append("\n"); // particle y0:w
+
             } catch (java.lang.RuntimeException re) {
                export.append("Export Failure!\n");
             }
@@ -282,11 +283,12 @@ public class DataExporter {
                   succesfullFits.add(index);
                }
             }
-         } catch (OptimizationException oe) {
+         } catch (RuntimeException oe) {
             String msg = "Fit failed for dataseries: " + data_.get(index).id();
             studio_.alerts().postAlert("Fit error", this.getClass(), msg);
             studio_.logs().logError(msg);
          }
+
       }
       String title = null;
       switch(type_) {

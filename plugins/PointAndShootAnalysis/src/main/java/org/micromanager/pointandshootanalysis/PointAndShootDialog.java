@@ -41,6 +41,8 @@ import javax.swing.WindowConstants;
 import javax.swing.event.ChangeEvent;
 import net.miginfocom.swing.MigLayout;
 import org.micromanager.Studio;
+import org.micromanager.data.DataProvider;
+import org.micromanager.data.Datastore;
 import org.micromanager.display.DataViewer;
 import org.micromanager.pointandshootanalysis.data.Terms;
 import org.micromanager.propertymap.MutablePropertyMapView;
@@ -101,7 +103,7 @@ public class PointAndShootDialog extends MMDialog {
       locationsField.setText(profileSettings_.getString(Terms.LOCATIONSFILENAME,
                profileSettings_.getString(Terms.LOCATIONSFILENAME, "")));
       locationsField.setHorizontalAlignment(JTextField.LEFT);
-      super.add(locationsField, "span 2, split 2");
+      super.add(locationsField, "span 2, split 3");
 
       final JButton locationsFieldButton =  mcsButton(smallButtonSize, arialSmallFont);
       locationsFieldButton.setText("...");
@@ -113,7 +115,31 @@ public class PointAndShootDialog extends MMDialog {
             locationsField.setText(f.getAbsolutePath());
          }
       });
-      super.add(locationsFieldButton, "wrap");
+      super.add(locationsFieldButton);
+
+      final JButton acqOpenButton = mcsButton(smallButtonSize, arialSmallFont);
+      acqOpenButton.setText("From Acq");
+      acqOpenButton.addActionListener((ActionEvent evt) -> {
+         boolean fail = true;
+         final DataViewer activeDataViewer = studio_.displays().getActiveDataViewer();
+         if (activeDataViewer != null) {
+            final DataProvider dataProvider = activeDataViewer.getDataProvider();
+            if (dataProvider instanceof Datastore) {
+               final Datastore datastore = (Datastore) dataProvider;
+               final String savePath = datastore.getSavePath();
+               final String pasLog =savePath + File.separator + "PointAndShoot.log";
+               final File f = new File(pasLog);
+               if (f.canRead()) {
+                  locationsField.setText(f.getAbsolutePath());
+                  fail = false;
+               }
+            }
+         }
+         if (fail) {
+            studio_.logs().showError("Failed to locate Point And Shoot log");
+         }
+      });
+      super.add(acqOpenButton, "push, wrap");
       
       JLabel radiusText = new JLabel("Radius of bleach spot (pixels)");
       super.add(radiusText);
@@ -122,9 +148,8 @@ public class PointAndShootDialog extends MMDialog {
       final SpinnerNumberModel sModel = new SpinnerNumberModel(radius, 1, 20, 1);
       final JSpinner radiusSpinner = new JSpinner (sModel);
       radiusSpinner.setMinimumSize(spinnerSize);
-      radiusSpinner.addChangeListener((ChangeEvent e) -> {
-         profileSettings_.putInteger(Terms.RADIUS, (Integer) radiusSpinner.getValue());
-      });
+      radiusSpinner.addChangeListener((ChangeEvent e) ->
+              profileSettings_.putInteger(Terms.RADIUS, (Integer) radiusSpinner.getValue()));
       super.add(radiusSpinner, "wrap");
       
       JLabel nrFramesBeforeText = new JLabel("Frames before bleach (used to normalize)");
@@ -133,9 +158,9 @@ public class PointAndShootDialog extends MMDialog {
       final SpinnerNumberModel beforeModel = new SpinnerNumberModel(nrFramesBefore, 1, 1000, 1);
       final JSpinner beforeSpinner = new JSpinner (beforeModel);
       beforeSpinner.setMinimumSize(spinnerSize);
-      beforeSpinner.addChangeListener((ChangeEvent e) -> {
-         profileSettings_.putInteger(Terms.NRFRAMESBEFORE, (Integer) beforeSpinner.getValue());
-      });
+      beforeSpinner.addChangeListener((ChangeEvent e) ->
+         profileSettings_.putInteger(Terms.NRFRAMESBEFORE, (Integer) beforeSpinner.getValue())
+      );
       super.add(beforeSpinner, "wrap");
       /*
       JLabel nrFramesAfterText = new JLabel("Nr. of Frames after");
@@ -154,9 +179,9 @@ public class PointAndShootDialog extends MMDialog {
       final SpinnerNumberModel maxDistanceModel = new SpinnerNumberModel(maxDistance, 1, 100, 1);
       final JSpinner maxDistanceSpinner = new JSpinner (maxDistanceModel);
       maxDistanceSpinner.setMinimumSize(spinnerSize);
-      maxDistanceSpinner.addChangeListener((ChangeEvent e) -> {
-         profileSettings_.putInteger(Terms.MAXDISTANCE, (Integer) maxDistanceSpinner.getValue());
-      });
+      maxDistanceSpinner.addChangeListener((ChangeEvent e) ->
+         profileSettings_.putInteger(Terms.MAXDISTANCE, (Integer) maxDistanceSpinner.getValue())
+      );
       super.add(maxDistanceSpinner, "wrap");
       
       super.add(new JLabel("Camera Offset"));
@@ -164,9 +189,8 @@ public class PointAndShootDialog extends MMDialog {
       final SpinnerNumberModel offsetModel = new SpinnerNumberModel(offset, 1, 10000, 10);
       final JSpinner offsetSpinner = new JSpinner (offsetModel);
       offsetSpinner.setMinimumSize(spinnerSize);
-      offsetSpinner.addChangeListener((ChangeEvent e) -> {
-         profileSettings_.putInteger(Terms.CAMERAOFFSET, (Integer) offsetSpinner.getValue());
-      });
+      offsetSpinner.addChangeListener((ChangeEvent e) ->
+              profileSettings_.putInteger(Terms.CAMERAOFFSET, (Integer) offsetSpinner.getValue()));
       super.add(offsetSpinner, "wrap");
       
       // Even when we no longer
@@ -176,9 +200,9 @@ public class PointAndShootDialog extends MMDialog {
       boolean fix = profileSettings_.getBoolean(Terms.FIXBLEACHINPARTICLE, true);
       final JCheckBox fixBleachBox = new JCheckBox();
       fixBleachBox.setSelected(fix);
-      fixBleachBox.addChangeListener((ChangeEvent e) -> {
-         profileSettings_.putBoolean(Terms.FIXBLEACHINPARTICLE, fixBleachBox.isSelected());
-      });
+      fixBleachBox.addChangeListener((ChangeEvent e) ->
+         profileSettings_.putBoolean(Terms.FIXBLEACHINPARTICLE, fixBleachBox.isSelected())
+      );
       super.add(fixBleachBox, "wrap");
       
       super.add(new JLabel("Nr of frames used to fix bleach-particle offset"));
@@ -186,24 +210,23 @@ public class PointAndShootDialog extends MMDialog {
       final SpinnerNumberModel fixFramesModel = new SpinnerNumberModel(nrFramesToFixBleach, 1, 100, 1);
       final JSpinner fixBleachSpinner = new JSpinner (fixFramesModel);
       fixBleachSpinner.setMinimumSize(spinnerSize);
-      fixBleachSpinner.addChangeListener((ChangeEvent e) -> {
-         profileSettings_.putInteger(Terms.NRFRAMESTOFIXBLEACH, (Integer) fixBleachSpinner.getValue());
-      });
+      fixBleachSpinner.addChangeListener((ChangeEvent e) ->
+         profileSettings_.putInteger(Terms.NRFRAMESTOFIXBLEACH, (Integer) fixBleachSpinner.getValue())
+      );
       super.add(fixBleachSpinner, "wrap");
       
       JButton helpButton = mcsButton(buttonSize, arialSmallFont);
       helpButton.setText("Help");
-      helpButton.addActionListener((ActionEvent evt) -> {
+      helpButton.addActionListener((ActionEvent evt) ->
          new Thread(org.micromanager.internal.utils.GUIUtils.makeURLRunnable(
-                 "https://micro-manager.org/wiki/Point_and_Shoot_Analysis")).start();
-      });
+                 "https://micro-manager.org/wiki/Point_and_Shoot_Analysis")).start()
+      );
       super.add(helpButton, "span 2, split 3");
 
       JButton cancelButton = mcsButton(buttonSize, arialSmallFont);
       cancelButton.setText("Cancel");
-      cancelButton.addActionListener((ActionEvent evt) -> {
-         ourDialog.dispose();
-      });
+      cancelButton.addActionListener((ActionEvent evt) ->
+              ourDialog.dispose());
       super.add(cancelButton, "tag cancel");
       
       JButton okButton = mcsButton(buttonSize, arialSmallFont);
@@ -257,18 +280,16 @@ public class PointAndShootDialog extends MMDialog {
    
    public void setStatus(String status) {
       if (!SwingUtilities.isEventDispatchThread()) {
-         SwingUtilities.invokeLater(() -> {
-            setStatus(status);
-         });
+         SwingUtilities.invokeLater(() ->
+                 setStatus(status));
       }
       statusString_.setText(status);
    }
    
    public void setProgress(double progress) {
       if (!SwingUtilities.isEventDispatchThread()) {
-         SwingUtilities.invokeLater(() -> {
-            setProgress(progress);
-         });
+         SwingUtilities.invokeLater(() ->
+                 setProgress(progress));
       }
       int p = (int) (progress * 100.0);
       progressString_.setText(" " + p + "%");
