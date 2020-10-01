@@ -186,7 +186,7 @@ public class PointAndShootAnalyzer implements Runnable {
             Metadata metadata = dataProvider.getImage(c).getMetadata();
             PropertyMap userData = metadata.getUserData();
 
-            // for backward coimpatabilityh with erronous file type
+            // for backward compatability with erronous file type
             if (userData.containsPropertyMap("UserData")) {
                userData = userData.getPropertyMap("UserData", null);
             }
@@ -817,8 +817,6 @@ public class PointAndShootAnalyzer implements Runnable {
    /**
     * Should only be called after normalized Bleach Values have been calculated
     * @param pasData
-    * @param cameraOffset
-    * @param controlAvgIntensity
     * @param frameTimeStamps
     * @return 
     */

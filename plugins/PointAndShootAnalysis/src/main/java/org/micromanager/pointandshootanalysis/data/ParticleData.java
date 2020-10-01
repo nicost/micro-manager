@@ -393,7 +393,7 @@ public class ParticleData {
          }
       }
 
-      if (minPixel.distance(new Point2D_I32(gResult.width / 2, gResult.height / 2)) 
+      if (minPixel.distance(new Point2D_I32(gResult.width / 2, gResult.height / 2))
               < maxDistance) {
          double mean = GImageStatistics.mean(gResult);
          double value = gResult.get(minPixel.x, minPixel.y);

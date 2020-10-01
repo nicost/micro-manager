@@ -98,7 +98,7 @@ public class PointAndShootDialog extends MMDialog {
              "containing Point and Shoot  timestamps and locations");
       super.add(explanationLabel, "span 2, wrap");
       
-      final JTextField locationsField = new JTextField(50);
+      final JTextField locationsField = new JTextField(40);
       locationsField.setFont(arialSmallFont);
       locationsField.setText(profileSettings_.getString(Terms.LOCATIONSFILENAME,
                profileSettings_.getString(Terms.LOCATIONSFILENAME, "")));
@@ -118,7 +118,7 @@ public class PointAndShootDialog extends MMDialog {
       super.add(locationsFieldButton);
 
       final JButton acqOpenButton = mcsButton(smallButtonSize, arialSmallFont);
-      acqOpenButton.setText("From Acq");
+      acqOpenButton.setText("From Acq.");
       acqOpenButton.addActionListener((ActionEvent evt) -> {
          boolean fail = true;
          final DataViewer activeDataViewer = studio_.displays().getActiveDataViewer();
@@ -139,7 +139,7 @@ public class PointAndShootDialog extends MMDialog {
             studio_.logs().showError("Failed to locate Point And Shoot log");
          }
       });
-      super.add(acqOpenButton, "push, wrap");
+      super.add(acqOpenButton, "w 80!, push, wrap");
       
       JLabel radiusText = new JLabel("Radius of bleach spot (pixels)");
       super.add(radiusText);
@@ -228,10 +228,14 @@ public class PointAndShootDialog extends MMDialog {
       cancelButton.addActionListener((ActionEvent evt) ->
               ourDialog.dispose());
       super.add(cancelButton, "tag cancel");
-      
+
+      statusString_ = new JLabel("Inactive...");
       JButton okButton = mcsButton(buttonSize, arialSmallFont);
       okButton.setText("Execute");
       okButton.addActionListener((ActionEvent evt) -> {
+         if (!statusString_.getText().equals("Inactive...")) {
+            return;
+         }
          DataViewer activeDataViewer = studio_.displays().getActiveDataViewer();
          if (activeDataViewer == null) {
             studio_.logs().showError("Please open image data first");
@@ -248,14 +252,14 @@ public class PointAndShootDialog extends MMDialog {
             return;
          }
          profileSettings_.putString(Terms.LOCATIONSFILENAME, fileName);
+
          Thread analysisThread = new Thread(new PointAndShootAnalyzer(studio,
                  profileSettings_.toPropertyMap(), this));
          analysisThread.start();
          //ourDialog.dispose();
       });
       super.add(okButton, "tag ok, wrap");
-      
-      statusString_ = new JLabel("Inactive...");
+
       super.add(statusString_, "wrap");
       
       progressString_ = new JLabel(" 0%");
