@@ -12,7 +12,11 @@ package org.micromanager.multicamera;
 
 import com.google.common.eventbus.Subscribe;
 
+import java.awt.Font;
 import java.awt.Toolkit;
+import java.awt.event.ActionEvent;
+import java.awt.event.FocusEvent;
+import java.awt.event.MouseEvent;
 import java.text.ParseException;
 
 import javax.swing.*;
@@ -42,19 +46,16 @@ import org.micromanager.internal.utils.WindowPositioning;
  */
 public class MultiCameraFrame extends JFrame {
    private static final long serialVersionUID = 1L;
-   private final Studio gui_;
+   private final Studio studio_;
    private final CMMCore core_;
    private int EMGainMin_ = 4;
    private int EMGainMax_ = 1000;
-   private final String[] cameras_;
    private ArrayList<String> camerasInUse_;
    private String coreCamera_;
    private boolean initialized_ = false;
    private volatile boolean externalCameraChange_ = false;
    private static final String MIXED = "";
    private static final int MIXEDINT = -1;
-   private static final String FRAMEXPOS = "FRAMEXPOS";
-   private static final String FRAMEYPOS = "FRAMEYPOS";
    private static final String MODE = "Output_Amplifier";
    private static final String MODECONV16 = "Conventional-16bit";
    private static final String MODEEM14 = "EM-14bit";
@@ -79,19 +80,21 @@ public class MultiCameraFrame extends JFrame {
    private static final String PHYSCAM3 = "Physical Camera 3";
    private static final String PHYSCAM4 = "Physical Camera 4";
 
-   /** Creates new form MultiCameraFrame
-     * @param gui - handle to instance of the Studio
-     * @throws java.lang.Exception 
-     */
-   public MultiCameraFrame(Studio gui) throws Exception {
-      gui_ = gui;
-      core_ = gui_.getCMMCore();
+   /**
+    * Creates new form MultiCameraFrame.
+    *
+    * @param studio - handle to instance of the Studio
+    * @throws java.lang.Exception Not sure what Exceptions this can generate.
+    */
+   public MultiCameraFrame(Studio studio) throws Exception {
+      studio_ = studio;
+      core_ = studio_.getCMMCore();
 
       mmcorej.StrVector cameras = core_.getLoadedDevicesOfType(DeviceType.CameraDevice);
-      cameras_ = cameras.toArray();
+      String[] cameras_ = cameras.toArray();
 
       if (cameras_.length < 1) {
-         gui_.logs().showError("This plugin needs at least one camera");
+         studio_.logs().showError("This plugin needs at least one camera");
          throw new IllegalArgumentException("This plugin needs at least one camera");
       }
 
@@ -100,11 +103,6 @@ public class MultiCameraFrame extends JFrame {
 
       core_.getImageWidth();
       core_.getImageHeight();
-
-      if (cameras_.length < 1) {
-         gui_.logs().showError("This plugin needs at least one camera");
-         throw new IllegalArgumentException("This plugin needs at least one camera");
-      }
 
       // find the first non-multi-channel camera to test properties
       String testCamera = camerasInUse_.get(0);
@@ -227,26 +225,26 @@ public class MultiCameraFrame extends JFrame {
    // <editor-fold defaultstate="collapsed" desc="Generated Code">//GEN-BEGIN:initComponents
    private void initComponents() {
 
-      jCheckBox1 = new javax.swing.JCheckBox();
-      EMGainSlider = new javax.swing.JSlider();
-      EMGainTextField = new javax.swing.JTextField();
-      modeComboBox = new javax.swing.JComboBox();
-      jLabel4 = new javax.swing.JLabel();
-      jLabel5 = new javax.swing.JLabel();
-      GainLabel = new javax.swing.JLabel();
-      speedComboBox = new javax.swing.JComboBox();
-      SpeedLabel = new javax.swing.JLabel();
-      EMCheckBox = new javax.swing.JCheckBox();
-      gainComboBox = new javax.swing.JComboBox();
-      FrameTransferLabel = new javax.swing.JLabel();
-      frameTransferComboBox = new javax.swing.JComboBox();
-      jLabel9 = new javax.swing.JLabel();
-      cameraSelectComboBox = new javax.swing.JComboBox();
-      TriggerLabel = new javax.swing.JLabel();
-      triggerComboBox = new javax.swing.JComboBox();
-      tempButton = new javax.swing.JButton();
-      tempLabel = new javax.swing.JLabel();
-      jLabel1 = new javax.swing.JLabel();
+      JCheckBox jCheckBox1 = new JCheckBox();
+      EMGainSlider = new JSlider();
+      EMGainTextField = new JTextField();
+      modeComboBox = new JComboBox<>();
+      jLabel4 = new JLabel();
+      jLabel5 = new JLabel();
+      GainLabel = new JLabel();
+      speedComboBox = new JComboBox<>();
+      SpeedLabel = new JLabel();
+      EMCheckBox = new JCheckBox();
+      gainComboBox = new JComboBox<>();
+      FrameTransferLabel = new JLabel();
+      frameTransferComboBox = new JComboBox<>();
+      JLabel jLabel9 = new JLabel();
+      cameraSelectComboBox = new JComboBox<>();
+      TriggerLabel = new JLabel();
+      triggerComboBox = new JComboBox<>();
+      JButton tempButton = new JButton();
+      tempLabel = new JLabel();
+      JLabel jLabel1 = new JLabel();
 
       jCheckBox1.setText("jCheckBox1");
 
@@ -260,117 +258,73 @@ public class MultiCameraFrame extends JFrame {
          }
       });
 
-      EMGainTextField.setFont(new java.awt.Font("Lucida Grande", 0, 10)); // NOI18N
+      EMGainTextField.setFont(new java.awt.Font("Lucida Grande", Font.PLAIN, 10)); // NOI18N
       EMGainTextField.setText("4");
       EMGainTextField.addFocusListener(new java.awt.event.FocusAdapter() {
          public void focusLost(java.awt.event.FocusEvent evt) {
             EMGainTextFieldFocusLost(evt);
          }
       });
-      EMGainTextField.addActionListener(new java.awt.event.ActionListener() {
-         public void actionPerformed(java.awt.event.ActionEvent evt) {
-            EMGainTextFieldActionPerformed(evt);
-         }
-      });
-      EMGainTextField.addKeyListener(new java.awt.event.KeyAdapter() {
-         public void keyReleased(java.awt.event.KeyEvent evt) {
-            EMGainTextFieldKeyReleased(evt);
-         }
-      });
+      EMGainTextField.addActionListener(this::EMGainTextFieldActionPerformed);
 
-      modeComboBox.setFont(new java.awt.Font("Lucida Grande", 0, 10)); // NOI18N
-      modeComboBox.setModel(new javax.swing.DefaultComboBoxModel(new String[] { "EM", "Conventional" }));
-      modeComboBox.addItemListener(new java.awt.event.ItemListener() {
-         public void itemStateChanged(java.awt.event.ItemEvent evt) {
-            modeComboBoxItemStateChanged(evt);
-         }
-      });
-      modeComboBox.addActionListener(new java.awt.event.ActionListener() {
-         public void actionPerformed(java.awt.event.ActionEvent evt) {
-            modeComboBoxActionPerformed(evt);
-         }
-      });
+      modeComboBox.setFont(new java.awt.Font("Lucida Grande", Font.PLAIN, 10)); // NOI18N
+      modeComboBox.setModel(new DefaultComboBoxModel<>(new String[] { "EM", "Conventional" }));
+      modeComboBox.addItemListener(this::modeComboBoxItemStateChanged);
 
-      jLabel4.setFont(new java.awt.Font("Lucida Grande", 0, 10)); // NOI18N
+      final Font plainFont10 = new Font("Lucida Frande", Font.PLAIN, 20);
+
+      jLabel4.setFont(plainFont10); // NOI18N
       jLabel4.setText("EM Gain");
 
-      jLabel5.setFont(new java.awt.Font("Lucida Grande", 0, 10)); // NOI18N
+      jLabel5.setFont(plainFont10); // NOI18N
       jLabel5.setText("Mode");
 
-      GainLabel.setFont(new java.awt.Font("Lucida Grande", 0, 10)); // NOI18N
+      GainLabel.setFont(plainFont10); // NOI18N
       GainLabel.setText("Gain");
 
-      speedComboBox.setFont(new java.awt.Font("Lucida Grande", 0, 10)); // NOI18N
-      speedComboBox.setModel(new javax.swing.DefaultComboBoxModel(new String[] { "1MHz", "3MHz", "5MHz", "10MHz" }));
-      speedComboBox.addItemListener(new java.awt.event.ItemListener() {
-         public void itemStateChanged(java.awt.event.ItemEvent evt) {
-            speedComboBoxItemStateChanged(evt);
-         }
-      });
+      speedComboBox.setFont(plainFont10); // NOI18N
+      speedComboBox.setModel(new DefaultComboBoxModel<>(new String[] { "1MHz", "3MHz", "5MHz", "10MHz" }));
+      speedComboBox.addItemListener(this::speedComboBoxItemStateChanged);
 
-      SpeedLabel.setFont(new java.awt.Font("Lucida Grande", 0, 10)); // NOI18N
+      SpeedLabel.setFont(plainFont10); // NOI18N
       SpeedLabel.setText("Speed");
 
-      EMCheckBox.setFont(new java.awt.Font("Lucida Grande", 0, 10)); // NOI18N
+      EMCheckBox.setFont(plainFont10); // NOI18N
       EMCheckBox.setText("Use");
-      EMCheckBox.addActionListener(new java.awt.event.ActionListener() {
-         public void actionPerformed(java.awt.event.ActionEvent evt) {
-            EMCheckBoxActionPerformed(evt);
-         }
-      });
+      EMCheckBox.addActionListener(this::EMCheckBoxActionPerformed);
 
-      gainComboBox.setFont(new java.awt.Font("Lucida Grande", 0, 10)); // NOI18N
-      gainComboBox.setModel(new javax.swing.DefaultComboBoxModel(new String[] { "1", "2", "3", "4", "5" }));
-      gainComboBox.addItemListener(new java.awt.event.ItemListener() {
-         public void itemStateChanged(java.awt.event.ItemEvent evt) {
-            gainComboBoxItemStateChanged(evt);
-         }
-      });
+      gainComboBox.setFont(plainFont10); // NOI18N
+      gainComboBox.setModel(new DefaultComboBoxModel<>(new String[] { "1", "2", "3", "4", "5" }));
+      gainComboBox.addItemListener(this::gainComboBoxItemStateChanged);
 
-      FrameTransferLabel.setFont(new java.awt.Font("Lucida Grande", 0, 10)); // NOI18N
+      FrameTransferLabel.setFont(plainFont10); // NOI18N
       FrameTransferLabel.setText("OverlapMode");
 
-      frameTransferComboBox.setFont(new java.awt.Font("Lucida Grande", 0, 10)); // NOI18N
-      frameTransferComboBox.setModel(new javax.swing.DefaultComboBoxModel(new String[] { "On", "Off" }));
-      frameTransferComboBox.addItemListener(new java.awt.event.ItemListener() {
-         public void itemStateChanged(java.awt.event.ItemEvent evt) {
-            frameTransferComboBoxItemStateChanged(evt);
-         }
-      });
+      frameTransferComboBox.setFont(plainFont10); // NOI18N
+      frameTransferComboBox.setModel(new DefaultComboBoxModel<>(new String[] { "On", "Off" }));
+      frameTransferComboBox.addItemListener(this::frameTransferComboBoxItemStateChanged);
 
-      jLabel9.setFont(new java.awt.Font("Lucida Grande", 0, 10)); // NOI18N
+      jLabel9.setFont(plainFont10); // NOI18N
       jLabel9.setText("Active Camera");
 
-      cameraSelectComboBox.setFont(new java.awt.Font("Lucida Grande", 0, 10)); // NOI18N
-      cameraSelectComboBox.setModel(new javax.swing.DefaultComboBoxModel(new String[] { "1", "2", "4", "8" }));
-      cameraSelectComboBox.addItemListener(new java.awt.event.ItemListener() {
-         public void itemStateChanged(java.awt.event.ItemEvent evt) {
-            cameraSelectComboBoxItemStateChanged(evt);
-         }
-      });
+      cameraSelectComboBox.setFont(plainFont10); // NOI18N
+      cameraSelectComboBox.setModel(new DefaultComboBoxModel<>(new String[] { "1", "2", "4", "8" }));
+      cameraSelectComboBox.addItemListener(this::cameraSelectComboBoxItemStateChanged);
 
-      TriggerLabel.setFont(new java.awt.Font("Lucida Grande", 0, 10)); // NOI18N
+      TriggerLabel.setFont(plainFont10); // NOI18N
       TriggerLabel.setText("Trigger");
 
-      triggerComboBox.setFont(new java.awt.Font("Lucida Grande", 0, 10)); // NOI18N
-      triggerComboBox.setModel(new javax.swing.DefaultComboBoxModel(new String[] { "On", "Off" }));
-      triggerComboBox.addItemListener(new java.awt.event.ItemListener() {
-         public void itemStateChanged(java.awt.event.ItemEvent evt) {
-            triggerComboBoxItemStateChanged(evt);
-         }
-      });
+      triggerComboBox.setFont(plainFont10); // NOI18N
+      triggerComboBox.setModel(new DefaultComboBoxModel<>(new String[] { "On", "Off" }));
+      triggerComboBox.addItemListener(this::triggerComboBoxItemStateChanged);
 
-      tempButton.setFont(new java.awt.Font("Tahoma", 0, 10)); // NOI18N
+      tempButton.setFont(plainFont10); // NOI18N
       tempButton.setText("Temp");
-      tempButton.addActionListener(new java.awt.event.ActionListener() {
-         public void actionPerformed(java.awt.event.ActionEvent evt) {
-            tempButtonActionPerformed(evt);
-         }
-      });
+      tempButton.addActionListener(this::tempButtonActionPerformed);
 
       tempLabel.setText("jLabel11");
 
-      jLabel1.setFont(new java.awt.Font("Lucida Sans", 0, 10)); // NOI18N
+      jLabel1.setFont(plainFont10); // NOI18N
       jLabel1.setText("v 1.1");
 
       javax.swing.GroupLayout layout = new javax.swing.GroupLayout(getContentPane());
@@ -483,7 +437,7 @@ public class MultiCameraFrame extends JFrame {
             }
          }
       } catch (Exception ex) {
-         gui_.logs().showError(ex, MultiCameraFrame.class.getName() + " encountered an error.");
+         studio_.logs().showError(ex, MultiCameraFrame.class.getName() + " encountered an error.");
       }
       return gain;
    }
@@ -492,18 +446,18 @@ public class MultiCameraFrame extends JFrame {
       if (!initialized(false, false)) {
          return;
       }
-      gui_.live().setSuspended(true);
+      studio_.live().setSuspended(true);
       int val = EMGainSlider.getValue();
       try {
          for (String camera : camerasInUse_) {
             setPropertyIfPossible(camera, EMGAIN, NumberUtils.intToCoreString(val));
          }
-         gui_.app().refreshGUI();
+         // gui_.app().refreshGUI();
       } catch (Exception ex) {
-         gui_.logs().showError(ex, MultiCameraFrame.class.getName() + " encountered an error.");
+         studio_.logs().showError(ex, MultiCameraFrame.class.getName() + " encountered an error.");
       }
       finally {
-         gui_.live().setSuspended(false);
+         studio_.live().setSuspended(false);
       }
       EMGainTextField.setText(NumberUtils.intToDisplayString(val));
    }
@@ -525,7 +479,7 @@ public class MultiCameraFrame extends JFrame {
 
          }
       } catch (Exception ex) {
-         gui_.logs().showError(ex, MultiCameraFrame.class.getName() + " encountered an error.");
+         studio_.logs().showError(ex, MultiCameraFrame.class.getName() + " encountered an error.");
       }
       return false;
    }
@@ -561,7 +515,7 @@ public class MultiCameraFrame extends JFrame {
        if (!initialized(false, false)) {
           return;
        }
-       gui_.live().setSuspended(true);
+       studio_.live().setSuspended(true);
        boolean on = EMCheckBox.isSelected();
        String command = "Off";
        if (on) {
@@ -572,10 +526,10 @@ public class MultiCameraFrame extends JFrame {
              setPropertyIfPossible(camera, EMSWITCH, command);
           }
        } catch (Exception ex) {
-          gui_.logs().showError(ex, MultiCameraFrame.class.getName() + " encountered an error.");
+          studio_.logs().showError(ex, MultiCameraFrame.class.getName() + " encountered an error.");
        }
        finally {
-          gui_.live().setSuspended(false);
+          studio_.live().setSuspended(false);
        }
     }//GEN-LAST:event_EMCheckBoxActionPerformed
 
@@ -623,23 +577,23 @@ public class MultiCameraFrame extends JFrame {
             }
          }
       } catch (Exception ex) {
-         gui_.logs().showError(ex, MultiCameraFrame.class.getName() + " encountered an error.");
+         studio_.logs().showError(ex, MultiCameraFrame.class.getName() + " encountered an error.");
       }
       return mode;
    }
 
-    private void EMGainSliderMouseReleased(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_EMGainSliderMouseReleased
+    private void EMGainSliderMouseReleased(MouseEvent evt ) {
        setEMGain();
-       gui_.app().refreshGUI();
-    }//GEN-LAST:event_EMGainSliderMouseReleased
+       studio_.app().refreshGUI();
+    }
 
-    private void tempButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_tempButtonActionPerformed
-       gui_.live().setSuspended(true);
+    private void tempButtonActionPerformed(ActionEvent evt) {
+       studio_.live().setSuspended(true);
        updateTemp();
-       gui_.live().setSuspended(false);
-    }//GEN-LAST:event_tempButtonActionPerformed
+       studio_.live().setSuspended(false);
+    }
 
-    private void modeComboBoxItemStateChanged(java.awt.event.ItemEvent evt) {//GEN-FIRST:event_modeComboBoxItemStateChanged
+    private void modeComboBoxItemStateChanged(ItemEvent evt) {
        // Combo box selecting readout mode (EM/standard)
        if (!(evt.getStateChange() == ItemEvent.SELECTED)) {
           return;
@@ -649,23 +603,30 @@ public class MultiCameraFrame extends JFrame {
        }
 
        Object item = modeComboBox.getSelectedItem();
+       if (item == null) {
+          return;
+       }
        if (item.equals(MIXED)) {
           return;
        }
 
-       gui_.live().setSuspended(true);
+       studio_.live().setSuspended(true);
        String mode = item.toString();
        try {
           for (String camera : camerasInUse_) {
-             if (mode.equals(MODEEM14)) {
-                core_.setProperty(camera, ADCONVERTER, AD14BIT);
-                core_.setProperty(camera, MODE, EMMODE);
-             } else if (mode.equals(MODEEM16)) {
-                core_.setProperty(camera, ADCONVERTER, AD16BIT);
-                core_.setProperty(camera, MODE, EMMODE);
-             } else if (mode.equals(MODECONV16)) {
-                core_.setProperty(camera, ADCONVERTER, AD16BIT);
-                core_.setProperty(camera, MODE, NORMALMODE);
+             switch (mode) {
+                case MODEEM14:
+                   core_.setProperty(camera, ADCONVERTER, AD14BIT);
+                   core_.setProperty(camera, MODE, EMMODE);
+                   break;
+                case MODEEM16:
+                   core_.setProperty(camera, ADCONVERTER, AD16BIT);
+                   core_.setProperty(camera, MODE, EMMODE);
+                   break;
+                case MODECONV16:
+                   core_.setProperty(camera, ADCONVERTER, AD16BIT);
+                   core_.setProperty(camera, MODE, NORMALMODE);
+                   break;
              }
 
           }
@@ -673,49 +634,49 @@ public class MultiCameraFrame extends JFrame {
           updateItems(gainComboBox, AMPGAIN);
           updateItems(speedComboBox, SPEED);
 
-          gui_.app().refreshGUI();
+          studio_.app().refreshGUI();
        } catch (Exception ex) {
-          gui_.logs().showError(ex, MultiCameraFrame.class.getName() + " encountered an error.");
+          studio_.logs().showError(ex, MultiCameraFrame.class.getName() + " encountered an error.");
        }
        finally {
-          gui_.live().setSuspended(false);
+          studio_.live().setSuspended(false);
        }
-    }//GEN-LAST:event_modeComboBoxItemStateChanged
+    }
 
     private void gainComboBoxItemStateChanged(java.awt.event.ItemEvent evt) {//GEN-FIRST:event_gainComboBoxItemStateChanged
        if (!(evt.getStateChange() == ItemEvent.SELECTED)) {
           return;
        }
        setComboSelection(gainComboBox, AMPGAIN);
-       gui_.app().refreshGUI();
-    }//GEN-LAST:event_gainComboBoxItemStateChanged
+       studio_.app().refreshGUI();
+    }
 
-    private void speedComboBoxItemStateChanged(java.awt.event.ItemEvent evt) {//GEN-FIRST:event_speedComboBoxItemStateChanged
+    private void speedComboBoxItemStateChanged(java.awt.event.ItemEvent evt) {
        if (!(evt.getStateChange() == ItemEvent.SELECTED)) {
           return;
        }
        setComboSelection(speedComboBox, SPEED);
-       gui_.app().refreshGUI();
-    }//GEN-LAST:event_speedComboBoxItemStateChanged
+       studio_.app().refreshGUI();
+    }
 
-    private void frameTransferComboBoxItemStateChanged(java.awt.event.ItemEvent evt) {//GEN-FIRST:event_frameTransferComboBoxItemStateChanged
+    private void frameTransferComboBoxItemStateChanged(java.awt.event.ItemEvent evt) {
        if (!(evt.getStateChange() == ItemEvent.SELECTED)) {
           return;
        }
        setComboSelection(frameTransferComboBox, FRAMETRANSFER);
-       gui_.app().refreshGUI();
-    }//GEN-LAST:event_frameTransferComboBoxItemStateChanged
+       studio_.app().refreshGUI();
+    }
 
-    private void triggerComboBoxItemStateChanged(java.awt.event.ItemEvent evt) {//GEN-FIRST:event_triggerComboBoxItemStateChanged
+    private void triggerComboBoxItemStateChanged(java.awt.event.ItemEvent evt) {
        if (!(evt.getStateChange() == ItemEvent.SELECTED)) {
           return;
        }
        setComboSelection(triggerComboBox, TRIGGER);
-       gui_.app().refreshGUI();
-    }//GEN-LAST:event_triggerComboBoxItemStateChanged
+       studio_.app().refreshGUI();
+    }
 
    private void updateCamerasInUse(String camera) {
-      camerasInUse_ = new ArrayList<String>();
+      camerasInUse_ = new ArrayList<>();
       if (core_.getNumberOfCameraChannels() == 1) {
          camerasInUse_.add(camera);
       } else if (core_.getNumberOfCameraChannels() > 1) {
@@ -733,14 +694,13 @@ public class MultiCameraFrame extends JFrame {
                camerasInUse_.add(coreCamera_);
             }
          } catch (Exception ex) {
+            studio_.logs().logError(ex);
          }
       }
    }
 
-    private void cameraSelectComboBoxItemStateChanged(java.awt.event.ItemEvent evt) {//GEN-FIRST:event_cameraSelectComboBoxItemStateChanged
-       
-      
-       if (!(evt.getStateChange() == ItemEvent.SELECTED)) {
+    private void cameraSelectComboBoxItemStateChanged(java.awt.event.ItemEvent evt) {
+      if (!(evt.getStateChange() == ItemEvent.SELECTED)) {
           return;
        }
        if (!initialized(false, false)) {
@@ -754,7 +714,7 @@ public class MultiCameraFrame extends JFrame {
        externalCameraChange_ = false;
  
 
-       gui_.live().setSuspended(true);
+       studio_.live().setSuspended(true);
        try {
           // Use the initialize flag to prevent pushing settings back to the hardware
           initialized(true, false);
@@ -774,43 +734,36 @@ public class MultiCameraFrame extends JFrame {
           initialized(true, true);
 
        } catch (Exception ex) {
-          gui_.logs().showError(ex, MultiCameraFrame.class.getName() + " encountered an error.");
+          studio_.logs().showError(ex, MultiCameraFrame.class.getName() + " encountered an error.");
        } finally {
-          gui_.live().setSuspended(false);
+          studio_.live().setSuspended(false);
        }
        if (!externalCameraChange) {
-          gui_.app().refreshGUI();
+          studio_.app().refreshGUI();
        }
-    }//GEN-LAST:event_cameraSelectComboBoxItemStateChanged
+    }
 
-    private void modeComboBoxActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_modeComboBoxActionPerformed
-
-    }//GEN-LAST:event_modeComboBoxActionPerformed
-
-    private void EMGainTextFieldKeyReleased(java.awt.event.KeyEvent evt) {//GEN-FIRST:event_EMGainTextFieldKeyReleased
-    
-    }//GEN-LAST:event_EMGainTextFieldKeyReleased
-
-   private void EMGainTextFieldFocusLost(java.awt.event.FocusEvent evt) {//GEN-FIRST:event_EMGainTextFieldFocusLost
-       handleEMGainTextFieldEvent();
-   }//GEN-LAST:event_EMGainTextFieldFocusLost
+   private void EMGainTextFieldFocusLost(FocusEvent evt) {
+      // check if event has the correct source?
+      handleEMGainTextFieldEvent();
+   }
 
    private void updateTemp() {
-      String tempText = "";
+      StringBuilder tempText = new StringBuilder();
       try {
          for (String camera : camerasInUse_) {
             if (core_.hasProperty(camera, TEMP)) {
-               tempText += core_.getProperty(camera, TEMP) + "\u00b0" + "C   ";
+               tempText.append(core_.getProperty(camera, TEMP)).append("\u00b0").append("C   ");
             }
 
          }
       } catch (Exception ex) {
-         gui_.logs().showError(ex, MultiCameraFrame.class.getName() + " encountered an error.");
+         studio_.logs().showError(ex, MultiCameraFrame.class.getName() + " encountered an error.");
       }
-      tempLabel.setText(tempText);
+      tempLabel.setText(tempText.toString());
    }
 
-   private void updateItems(javax.swing.JComboBox comboBox, String property) {
+   private void updateItems(JComboBox<String> comboBox, String property) {
       if (comboBox != null) {
          try {
             String camera = camerasInUse_.get(0);
@@ -821,16 +774,16 @@ public class MultiCameraFrame extends JFrame {
             for (int i = 0; i < vals.size(); i++) {
                newVals[i + 1] = vals.get(i);
             }
-            comboBox.setModel(new DefaultComboBoxModel(newVals));
+            comboBox.setModel(new DefaultComboBoxModel<>(newVals));
 
          } catch (Exception ex) {
-            gui_.logs().showError(ex, MultiCameraFrame.class.getName() + " encountered an error.");
+            studio_.logs().showError(ex, MultiCameraFrame.class.getName() + " encountered an error.");
          }
          getComboSelection(comboBox, property);
       }
    }
 
-   private void getComboSelection(javax.swing.JComboBox comboBox, String property) {
+   private void getComboSelection(JComboBox<String> comboBox, String property) {
       if (comboBox == null || !comboBox.isEnabled()) {
          return;
       }
@@ -847,16 +800,19 @@ public class MultiCameraFrame extends JFrame {
          }
          comboBox.setSelectedItem(val);
       } catch (Exception ex) {
-         gui_.logs().showError(ex, MultiCameraFrame.class.getName() + " encountered an error.");
+         studio_.logs().showError(ex, MultiCameraFrame.class.getName() + " encountered an error.");
       }
    }
 
-   private void setComboSelection(javax.swing.JComboBox comboBox, String property) {
+   private void setComboSelection(JComboBox<String> comboBox, String property) {
       if (!initialized(false, false)) {
          return;
       }
-      gui_.live().setSuspended(true);
+      studio_.live().setSuspended(true);
       String val = (String) comboBox.getSelectedItem();
+      if (val == null) {
+         return;
+      }
       if (val.equals(MIXED)) {
          getComboSelection(comboBox, property);
          return;
@@ -866,10 +822,10 @@ public class MultiCameraFrame extends JFrame {
             core_.setProperty(camera, property, val);
          }
       } catch (Exception ex) {
-         gui_.logs().showError(ex, MultiCameraFrame.class.getName() + " encountered an error.");
+         studio_.logs().showError(ex, MultiCameraFrame.class.getName() + " encountered an error.");
       }
       finally {
-         gui_.live().setSuspended(false);
+         studio_.live().setSuspended(false);
       }
    }
    // Variables declaration - do not modify//GEN-BEGIN:variables
@@ -880,19 +836,15 @@ public class MultiCameraFrame extends JFrame {
    private javax.swing.JLabel GainLabel;
    private javax.swing.JLabel SpeedLabel;
    private javax.swing.JLabel TriggerLabel;
-   private javax.swing.JComboBox cameraSelectComboBox;
-   private javax.swing.JComboBox frameTransferComboBox;
-   private javax.swing.JComboBox gainComboBox;
-   private javax.swing.JCheckBox jCheckBox1;
-   private javax.swing.JLabel jLabel1;
+   private javax.swing.JComboBox<String> cameraSelectComboBox;
+   private javax.swing.JComboBox<String> frameTransferComboBox;
+   private javax.swing.JComboBox<String> gainComboBox;
    private javax.swing.JLabel jLabel4;
    private javax.swing.JLabel jLabel5;
-   private javax.swing.JLabel jLabel9;
-   private javax.swing.JComboBox modeComboBox;
-   private javax.swing.JComboBox speedComboBox;
-   private javax.swing.JButton tempButton;
+   private javax.swing.JComboBox<String> modeComboBox;
+   private javax.swing.JComboBox<String> speedComboBox;
    private javax.swing.JLabel tempLabel;
-   private javax.swing.JComboBox triggerComboBox;
+   private javax.swing.JComboBox<String> triggerComboBox;
    // End of variables declaration//GEN-END:variables
 
  
@@ -909,15 +861,13 @@ public class MultiCameraFrame extends JFrame {
       try {
          if (device.equals("Core") && property.equals("Camera") && 
                  !value.equals(cameraSelectComboBox.getSelectedItem() ) ) {
-            SwingUtilities.invokeLater(new Runnable() {
-               @Override
-               public void run() {
-                  externalCameraChange_ = true;
-                  cameraSelectComboBox.setSelectedItem(value);
-               }
+            SwingUtilities.invokeLater(() -> {
+               externalCameraChange_ = true;
+               cameraSelectComboBox.setSelectedItem(value);
             });
          }
       } catch (Exception ex) {
+         studio_.logs().logError(ex);
       }
    }
 
@@ -927,7 +877,7 @@ public class MultiCameraFrame extends JFrame {
             core_.setProperty(device, property, value);
          }
       } catch (Exception ex) {
-         gui_.logs().logError(ex);
+         studio_.logs().logError(ex);
       }
    }
 
