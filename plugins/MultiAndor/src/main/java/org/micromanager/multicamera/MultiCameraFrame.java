@@ -267,7 +267,10 @@ public class MultiCameraFrame extends JFrame {
          }
       });
 
-      EMGainTextField.setFont(new java.awt.Font("Lucida Grande", Font.PLAIN, 10)); // NOI18N
+      final Font plainFont10 = new Font("Lucida Grande", Font.PLAIN, 10);
+
+
+      EMGainTextField.setFont(plainFont10); // NOI18N
       EMGainTextField.setText("4");
       EMGainTextField.addFocusListener(new java.awt.event.FocusAdapter() {
          public void focusLost(java.awt.event.FocusEvent evt) {
@@ -276,11 +279,9 @@ public class MultiCameraFrame extends JFrame {
       });
       EMGainTextField.addActionListener(this::EMGainTextFieldActionPerformed);
 
-      modeComboBox.setFont(new java.awt.Font("Lucida Grande", Font.PLAIN, 10)); // NOI18N
+      modeComboBox.setFont(plainFont10); // NOI18N
       modeComboBox.setModel(new DefaultComboBoxModel<>(new String[] {"EM", "Conventional"}));
       modeComboBox.addItemListener(this::modeComboBoxItemStateChanged);
-
-      final Font plainFont10 = new Font("Lucida Frande", Font.PLAIN, 20);
 
       jLabel4.setFont(plainFont10); // NOI18N
       jLabel4.setText("EM Gain");
