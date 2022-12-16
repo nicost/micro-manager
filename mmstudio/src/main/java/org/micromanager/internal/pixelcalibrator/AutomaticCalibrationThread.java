@@ -28,6 +28,7 @@ import boofcv.struct.image.GrayF32;
 import boofcv.struct.image.GrayU16;
 import ij.IJ;
 import ij.ImagePlus;
+import ij.gui.Roi;
 import ij.process.FloatProcessor;
 import ij.process.ImageProcessor;
 import java.awt.Point;
@@ -234,15 +235,21 @@ public class AutomaticCalibrationThread extends CalibrationThread {
             core_.snapImage();
             TaggedImage image = core_.getTaggedImage();
             studio_.live().displayImage(studio_.data().convertTaggedImage(image));
+            Roi roi = null;
             if (studio_.live().getDisplay() != null) {
                if (liveWin_ != studio_.live().getDisplay()) {
                   liveWin_ = studio_.live().getDisplay();
                   liveWin_.setCustomTitle("Calibrating...");
                   overlay_.setVisible(true);
                   liveWin_.addOverlay(overlay_);
+                  roi = liveWin_.getImagePlus().getRoi();
                }
             }
-            return ImageUtils.makeMonochromeProcessor(image);
+            ImageProcessor ip = ImageUtils.makeMonochromeProcessor(image);
+            if (roi != null) {
+               ip.setRoi(roi);
+            }
+            return ip;
          } catch (CalibrationFailedException e) {
             throw e;
          } catch (Exception ex) {
@@ -356,8 +363,14 @@ public class AutomaticCalibrationThread extends CalibrationThread {
       // First find the smallest detectable displacement.
       ImageProcessor baseImage = snapImageAt(x, y, simulate);
 
-      w = baseImage.getWidth();
-      h = baseImage.getHeight();
+      Rectangle rectangle = baseImage.getRoi();
+      if (rectangle != null) {
+         w = rectangle.width;
+         h = rectangle.height;
+      } else {
+         w = baseImage.getWidth();
+         h = baseImage.getHeight();
+      }
       int wSmall = smallestPowerOf2LessThanOrEqualTo(w / 4);
       int hSmall = smallestPowerOf2LessThanOrEqualTo(h / 4);
       sideSmall = Math.min(wSmall, hSmall);
