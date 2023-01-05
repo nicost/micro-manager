@@ -30,6 +30,8 @@ import javax.swing.JComboBox;
 import javax.swing.JPanel;
 import javax.swing.JTable;
 import javax.swing.ListSelectionModel;
+import javax.swing.event.CellEditorListener;
+import javax.swing.event.ChangeEvent;
 import javax.swing.table.TableCellEditor;
 import javax.swing.table.TableCellRenderer;
 import net.miginfocom.swing.MigLayout;
@@ -176,8 +178,14 @@ public class ShadingTable extends JTable {
    private final PresetCellEditor presetCellEditor_;
    private final LoadFileButtonCellEditor loadFileButtonCellEditor_;
 
-   ShadingTable(Studio gui, ShadingTableModel model,
-                MultiChannelShadingMigForm form) {
+   /**
+    * Generates the table with channel dropdown, file path, and button to change the file.
+    *
+    * @param gui Omnipresent Studio api
+    * @param model Model used for this table
+    * @param form Parent GUI
+    */
+   ShadingTable(Studio gui, ShadingTableModel model, MultiChannelShadingMigForm form) {
       super(model);
       gui_ = gui;
 
@@ -195,6 +203,17 @@ public class ShadingTable extends JTable {
       loadFileButtonCellEditor_ =
             new LoadFileButtonCellEditor(form);
       super.getColumnModel().getColumn(2).setCellEditor(loadFileButtonCellEditor_);
+      loadFileButtonCellEditor_.addCellEditorListener(new CellEditorListener() {
+         @Override
+         public void editingStopped(ChangeEvent e) {
+            form.repaint();
+         }
+
+         @Override
+         public void editingCanceled(ChangeEvent e) {
+
+         }
+      });
 
       super.setRowHeight((int) (super.getRowHeight() * 1.5));
 
