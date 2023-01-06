@@ -142,7 +142,7 @@ public class ShadingTable extends JTable {
                                                    boolean isSelected, int row, int column) {
          row_ = row;
          String[] presets = gui_.getCMMCore().getAvailableConfigs(
-               model_.getChannelGroup()).toArray();
+               model_.getChannelGroup()[2]).toArray();
          // remove presets that are already in use
          String[] usedPresets = model_.getUsedPresets(row);
          String[] comboPresets = new String[presets.length - usedPresets.length];
@@ -196,12 +196,10 @@ public class ShadingTable extends JTable {
       super.getColumnModel().getColumn(0).setCellEditor(presetCellEditor_);
 
       // Renderer and Editor for column 2 (button)
-      LoadFileButtonCellRenderer loadFileButtonRenderer =
-            new LoadFileButtonCellRenderer(form);
+      LoadFileButtonCellRenderer loadFileButtonRenderer = new LoadFileButtonCellRenderer(form);
       super.getColumnModel().getColumn(2).setCellRenderer(loadFileButtonRenderer);
 
-      loadFileButtonCellEditor_ =
-            new LoadFileButtonCellEditor(form);
+      loadFileButtonCellEditor_ = new LoadFileButtonCellEditor(form);
       super.getColumnModel().getColumn(2).setCellEditor(loadFileButtonCellEditor_);
       loadFileButtonCellEditor_.addCellEditorListener(new CellEditorListener() {
          @Override

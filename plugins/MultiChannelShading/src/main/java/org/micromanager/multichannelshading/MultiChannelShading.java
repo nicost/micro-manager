@@ -38,7 +38,7 @@ public class MultiChannelShading implements ProcessorPlugin, SciJavaPlugin {
    public static final String TOOLTIPDESCRIPTION =
          "Apply dark subtraction and flat-field correction";
 
-   public static final String VERSIONNUMBER = "0.3";
+   public static final String VERSIONNUMBER = "0.4";
 
    private Studio studio_;
 

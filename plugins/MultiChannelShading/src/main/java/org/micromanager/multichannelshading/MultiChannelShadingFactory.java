@@ -40,7 +40,7 @@ public class MultiChannelShadingFactory implements ProcessorFactory {
    public MultiChannelShadingFactory(Studio studio, PropertyMap settings) {
       studio_ = studio;
       channelGroup_ = settings.getString(
-            MultiChannelShadingMigForm.CHANNELGROUP, "Channels");
+            MultiChannelShadingMigForm.CHANNELGROUP1, "Channels");
       useOpenCL_ = settings.getBoolean(MultiChannelShadingMigForm.USEOPENCL,
             false);
       presets_ = settings.getStringList("Presets", "");

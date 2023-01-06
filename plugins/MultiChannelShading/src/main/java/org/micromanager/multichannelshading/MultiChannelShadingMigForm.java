@@ -34,6 +34,8 @@ import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.io.File;
 import java.util.ArrayList;
+import java.util.Objects;
+import javax.swing.DefaultComboBoxModel;
 import javax.swing.ImageIcon;
 import javax.swing.JButton;
 import javax.swing.JCheckBox;
@@ -53,6 +55,7 @@ import org.micromanager.data.ProcessorConfigurator;
 import org.micromanager.events.ChannelGroupChangedEvent;
 import org.micromanager.events.ShutdownCommencingEvent;
 import org.micromanager.internal.utils.FileDialogs;
+import org.micromanager.internal.utils.GUIUtils;
 import org.micromanager.internal.utils.WindowPositioning;
 import org.micromanager.propertymap.MutablePropertyMapView;
 
@@ -67,15 +70,18 @@ public class MultiChannelShadingMigForm extends JDialog implements ProcessorConf
    private final mmcorej.CMMCore mmc_;
 
    public static final String DARKFIELDFILENAME = "BackgroundFileName";
-   public static final String CHANNELGROUP = "ChannelGroup";
+   public static final String CHANNELGROUP1 = "ChannelGroup";
+   public static final String CHANNELGROUP2 = "ChannelGroup2";
    public static final String USEOPENCL = "UseOpenCL";
    private static final String EMPTY_FILENAME_INDICATOR = "None";
    private final String[] imageSuffixes = {"tif", "tiff", "jpg", "png"};
    private String backgroundFileName_;
-   private String groupName_;
+   private String groupName1_;
+   private String groupName2_;
    private String statusMessage_;
    private final Font arialSmallFont_;
-   private final JComboBox groupComboBox_;
+   private final JComboBox groupComboBox1_;
+   private final JComboBox groupComboBox2_;
    private final ShadingTableModel shadingTableModel_;
    private final Dimension buttonSize_;
    private final JLabel statusLabel_;
@@ -83,7 +89,7 @@ public class MultiChannelShadingMigForm extends JDialog implements ProcessorConf
 
 
    /**
-    * Creates new form MultiChannelShadingForm
+    * Creates new form MultiChannelShadingForm.
     *
     * @param settings
     * @param studio
@@ -121,53 +127,66 @@ public class MultiChannelShadingMigForm extends JDialog implements ProcessorConf
 
       super.add(
             new JLabel("Uncheck and Recheck Use checkboxes in Pipeline after changing settings"),
-            "span 5, wrap");
-
-      JLabel channelGroupLabel = new JLabel("Channel Group:");
-      channelGroupLabel.setFont(arialSmallFont_);
-      super.add(channelGroupLabel);
-
-      //populate group ComboBox
-      groupComboBox_ = new JComboBox();
-      String[] channelGroups = mmc_.getAvailableConfigGroups().toArray();
-      groupComboBox_.setModel(new javax.swing.DefaultComboBoxModel(
-            channelGroups));
-      groupName_ = settings_.getString(CHANNELGROUP,
-            profileSettings_.getString(CHANNELGROUP, ""));
-      groupComboBox_.setSelectedItem(groupName_);
-      groupComboBox_.addActionListener(new java.awt.event.ActionListener() {
-         @Override
-         public void actionPerformed(java.awt.event.ActionEvent evt) {
-            groupName_ = (String) groupComboBox_.getSelectedItem();
-            shadingTableModel_.setChannelGroup(groupName_);
-            updateAddAndRemoveButtons(addButton, removeButton);
-            profileSettings_.putString(CHANNELGROUP, groupName_);
-            studio_.data().notifyPipelineChanged();
-         }
-      });
-      super.add(groupComboBox_);
-
+            "span 2");
 
       JCheckBox useOpenCLCheckBox = new JCheckBox("Use GPU");
       useOpenCLCheckBox.setSelected(profileSettings_.getBoolean(USEOPENCL, false));
-      useOpenCLCheckBox.addActionListener(new ActionListener() {
-         @Override
-         public void actionPerformed(ActionEvent e) {
-            profileSettings_.putBoolean(USEOPENCL, useOpenCLCheckBox.isSelected());
-            studio_.data().notifyPipelineChanged();
-         }
+      useOpenCLCheckBox.addActionListener(e -> {
+         profileSettings_.putBoolean(USEOPENCL, useOpenCLCheckBox.isSelected());
+         studio_.data().notifyPipelineChanged();
       });
       super.add(useOpenCLCheckBox, "skip 2");
 
       JButton helpButton = new JButton("Help");
-      helpButton.addActionListener(new ActionListener() {
+      helpButton.addActionListener(e -> new Thread(GUIUtils.makeURLRunnable(
+            "https://micro-manager.org/wiki/Flat-Field_Correction")).start());
+      super.add(helpButton, "wrap");
+
+      JLabel channelGroupLabel = new JLabel("Channel Group 1:");
+      channelGroupLabel.setFont(arialSmallFont_);
+      super.add(channelGroupLabel);
+
+      //populate group 1 ComboBox
+      groupComboBox1_ = new JComboBox();
+      String[] channelGroups = mmc_.getAvailableConfigGroups().toArray();
+      groupComboBox1_.setModel(new DefaultComboBoxModel(channelGroups));
+      groupName1_ = settings_.getString(CHANNELGROUP1,
+            profileSettings_.getString(CHANNELGROUP1, ""));
+      groupComboBox1_.setSelectedItem(groupName1_);
+      groupComboBox1_.addActionListener(new ActionListener() {
          @Override
-         public void actionPerformed(ActionEvent e) {
-            new Thread(org.micromanager.internal.utils.GUIUtils.makeURLRunnable(
-                  "https://micro-manager.org/wiki/Flat-Field_Correction")).start();
+         public void actionPerformed(ActionEvent evt) {
+            groupName1_ = (String) groupComboBox1_.getSelectedItem();
+            shadingTableModel_.setChannelGroup(groupName1_, groupName2_);
+            updateAddAndRemoveButtons(addButton, removeButton);
+            profileSettings_.putString(CHANNELGROUP1, groupName1_);
+            studio_.data().notifyPipelineChanged();
          }
       });
-      super.add(helpButton, "wrap");
+      super.add(groupComboBox1_, "wrap");
+
+      JLabel channelGroupLabel2 = new JLabel("Channel Group 2:");
+      channelGroupLabel2.setFont(arialSmallFont_);
+      super.add(channelGroupLabel2);
+
+      //populate group 1 ComboBox
+      groupComboBox2_ = new JComboBox();
+      String[] channelGroups2 = mmc_.getAvailableConfigGroups().toArray();
+      groupComboBox2_.setModel(new DefaultComboBoxModel(channelGroups));
+      groupName2_ = settings_.getString(CHANNELGROUP2,
+            profileSettings_.getString(CHANNELGROUP2, ""));
+      groupComboBox2_.setSelectedItem(groupName2_);
+      groupComboBox2_.addActionListener(new ActionListener() {
+         @Override
+         public void actionPerformed(ActionEvent evt) {
+            groupName2_ = (String) groupComboBox2_.getSelectedItem();
+            shadingTableModel_.setChannelGroup(groupName1_, groupName2_);
+            updateAddAndRemoveButtons(addButton, removeButton);
+            profileSettings_.putString(CHANNELGROUP2, groupName2_);
+            studio_.data().notifyPipelineChanged();
+         }
+      });
+      super.add(groupComboBox2_, "wrap");
 
       JLabel darkImageLabel = new JLabel("Dark Image (common):");
       darkImageLabel.setFont(arialSmallFont_);
@@ -179,12 +198,8 @@ public class MultiChannelShadingMigForm extends JDialog implements ProcessorConf
       darkFieldTextField.setText(settings_.getString(DARKFIELDFILENAME,
             profileSettings_.getString(DARKFIELDFILENAME, "")));
       darkFieldTextField.setHorizontalAlignment(JTextField.RIGHT);
-      darkFieldTextField.addActionListener(new java.awt.event.ActionListener() {
-         @Override
-         public void actionPerformed(java.awt.event.ActionEvent evt) {
-            processBackgroundImage(darkFieldTextField.getText());
-         }
-      });
+      darkFieldTextField.addActionListener(
+            evt -> processBackgroundImage(darkFieldTextField.getText()));
       darkFieldTextField.addFocusListener(new FocusListener() {
          @Override
          public void focusGained(FocusEvent fe) {
@@ -203,16 +218,13 @@ public class MultiChannelShadingMigForm extends JDialog implements ProcessorConf
 
       final JButton darkFieldButton = mcsButton(buttonSize_, arialSmallFont_);
       darkFieldButton.setText("...");
-      darkFieldButton.addActionListener(new java.awt.event.ActionListener() {
-         @Override
-         public void actionPerformed(java.awt.event.ActionEvent evt) {
-            File f = FileDialogs.openFile(mcsPluginWindow, "Dark image",
-                  new FileDialogs.FileType("MMAcq", "Dark image",
-                        backgroundFileName_, true, imageSuffixes));
-            if (f != null) {
-               processBackgroundImage(f.getAbsolutePath());
-               darkFieldTextField.setText(backgroundFileName_);
-            }
+      darkFieldButton.addActionListener(evt -> {
+         File f = FileDialogs.openFile(mcsPluginWindow, "Dark image",
+               new FileDialogs.FileType("MMAcq", "Dark image",
+                     backgroundFileName_, true, imageSuffixes));
+         if (f != null) {
+            processBackgroundImage(f.getAbsolutePath());
+            darkFieldTextField.setText(backgroundFileName_);
          }
       });
       super.add(darkFieldButton, "wrap");
@@ -225,8 +237,8 @@ public class MultiChannelShadingMigForm extends JDialog implements ProcessorConf
          }
       };
       super.add(scrollPane, "span 5 2, grow, push");
-      shadingTableModel_ = new ShadingTableModel(studio_, imageCollection_);
-      shadingTableModel_.setChannelGroup(groupName_);
+      shadingTableModel_ = new ShadingTableModel(studio_, imageCollection_, this);
+      shadingTableModel_.setChannelGroup(groupName1_, groupName2_);
       final ShadingTable shadingTable =
             new ShadingTable(studio_, shadingTableModel_, this);
       scrollPane.setViewportView(shadingTable);
@@ -239,29 +251,23 @@ public class MultiChannelShadingMigForm extends JDialog implements ProcessorConf
       addButton.setText("Add");
       addButton.setMinimumSize(buttonSize_);
       addButton.setFont(arialSmallFont_);
-      addButton.setIcon(new ImageIcon(getClass().getResource(
-            "/org/micromanager/icons/plus.png")));
-      addButton.addActionListener(new java.awt.event.ActionListener() {
-         @Override
-         public void actionPerformed(java.awt.event.ActionEvent evt) {
-            shadingTableModel_.addRow();
-            updateAddAndRemoveButtons(addButton, removeButton);
-         }
+      addButton.setIcon(new ImageIcon(Objects.requireNonNull(getClass().getResource(
+            "/org/micromanager/icons/plus.png"))));
+      addButton.addActionListener(evt -> {
+         shadingTableModel_.addRow();
+         updateAddAndRemoveButtons(addButton, removeButton);
       });
       buttonPanel.add(addButton, "wrap");
 
       removeButton.setText("Remove");
       removeButton.setMinimumSize(buttonSize_);
       removeButton.setFont(arialSmallFont_);
-      removeButton.setIcon(new ImageIcon(getClass().getResource(
-            "/org/micromanager/icons/minus.png")));
-      removeButton.addActionListener(new java.awt.event.ActionListener() {
-         @Override
-         public void actionPerformed(java.awt.event.ActionEvent evt) {
-            shadingTable.stopCellEditing();
-            shadingTableModel_.removeRow(shadingTable.getSelectedRows());
-            updateAddAndRemoveButtons(addButton, removeButton);
-         }
+      removeButton.setIcon(new ImageIcon(Objects.requireNonNull(getClass().getResource(
+            "/org/micromanager/icons/minus.png"))));
+      removeButton.addActionListener(evt -> {
+         shadingTable.stopCellEditing();
+         shadingTableModel_.removeRow(shadingTable.getSelectedRows());
+         updateAddAndRemoveButtons(addButton, removeButton);
       });
       buttonPanel.add(removeButton);
 
@@ -283,14 +289,15 @@ public class MultiChannelShadingMigForm extends JDialog implements ProcessorConf
 
    @Override
    public void cleanup() {
-      shadingTableModel_.setChannelGroup(groupName_);
+      shadingTableModel_.setChannelGroup(groupName1_, groupName2_);
       super.dispose();
    }
 
    @Override
    public PropertyMap getSettings() {
       PropertyMap.Builder builder = PropertyMaps.builder();
-      builder.putString(CHANNELGROUP, shadingTableModel_.getChannelGroup());
+      builder.putString(CHANNELGROUP1, shadingTableModel_.getChannelGroup()[0]);
+      builder.putString(CHANNELGROUP2, shadingTableModel_.getChannelGroup()[1]);
       builder.putStringList("Presets", shadingTableModel_.getUsedPresets());
       builder.putString(DARKFIELDFILENAME, imageCollection_.getBackgroundFile());
       builder.putBoolean(USEOPENCL, profileSettings_.getBoolean(USEOPENCL, false));
@@ -399,9 +406,8 @@ public class MultiChannelShadingMigForm extends JDialog implements ProcessorConf
    @Subscribe
    public void onChannelGroupChanged(ChannelGroupChangedEvent channelGroupChangedEvent) {
       String[] channelGroups = mmc_.getAvailableConfigGroups().toArray();
-      groupComboBox_.setModel(new javax.swing.DefaultComboBoxModel(
-            channelGroups));
-      groupComboBox_.setSelectedItem(channelGroupChangedEvent.getNewChannelGroup());
+      groupComboBox1_.setModel(new DefaultComboBoxModel(channelGroups));
+      groupComboBox1_.setSelectedItem(channelGroupChangedEvent.getNewChannelGroup());
    }
 
 }
