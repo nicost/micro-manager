@@ -44,6 +44,7 @@ public class ShadingTableModel extends AbstractTableModel {
          ""
    };
    private String channelGroup1_;
+   private String preset1_;
    private String channelGroup2_;
    private List<String> presetList_;
    private List<String> fileList_;
@@ -122,32 +123,29 @@ public class ShadingTableModel extends AbstractTableModel {
       }
    }
 
-   public void setChannelGroup(String newGroup1, String newGroup2) {
+   public void set(String newGroup1, String newPreset1, String newGroup2) {
       try {
-            // first save our settings
-            {
-            String[] channels = presetList_.toArray(
-                  new String[presetList_.size()]);
-            String[] files = fileList_.toArray(
-                  new String[fileList_.size()]);
-            gui_.profile().getSettings(this.getClass()).putStringList(
-                  channelGroup1_ + "-" + channelGroup2_ + "-channels", channels);
-            gui_.profile().getSettings(this.getClass()).putStringList(
-                  channelGroup1_ + "-" + channelGroup2_ + "-files", files);
-            }
+         // first save our settings
+         String[] chs = presetList_.toArray(new String[presetList_.size()]);
+         String[] fs = fileList_.toArray(new String[fileList_.size()]);
+         String key = channelGroup1_ + "-" + preset1_ + "-" + channelGroup2_;
+         gui_.profile().getSettings(this.getClass()).putStringList(key + "-channels", chs);
+         gui_.profile().getSettings(this.getClass()).putStringList(key + "-files", fs);
          imageCollection_.clearFlatFields();
          channelGroup1_ = newGroup1;
+         preset1_ = newPreset1;
          channelGroup2_ = newGroup2;
 
          // then restore mapping from preferences
+         String newKey = channelGroup1_ + "-" + preset1_ + "-" + channelGroup2_;
          fileList_.clear();
          presetList_.clear();
          // Strange workaround since we can not pass null as default
          List<String> emptyList = new ArrayList<String>(0);
          List<String> channels = gui_.profile().getSettings(this.getClass())
-                     .getStringList(channelGroup1_ + "-" + channelGroup2_ + "-channels");
+                     .getStringList(newKey + "-channels");
          List<String> files = gui_.profile().getSettings(this.getClass())
-                     .getStringList(channelGroup1_ + "-" + channelGroup2_ + "-files");
+                     .getStringList(newKey + "-files");
          if (channels != null && files != null) {
             for (int i = 0; i < channels.size() && i < files.size(); i++) {
                imageCollection_.addFlatField(channels.get(i), files.get(i));
@@ -162,8 +160,16 @@ public class ShadingTableModel extends AbstractTableModel {
       fireTableDataChanged();
    }
 
-   public String[] getChannelGroup() {
-      return new String[] {channelGroup1_, channelGroup2_};
+   public String getChannelGroup1() {
+      return channelGroup1_;
+   }
+
+   public String getPreset1() {
+      return preset1_;
+   }
+
+   public String getChannelGroup2() {
+      return channelGroup2_;
    }
 
    public void addRow() {

@@ -142,7 +142,7 @@ public class ShadingTable extends JTable {
                                                    boolean isSelected, int row, int column) {
          row_ = row;
          String[] presets = gui_.getCMMCore().getAvailableConfigs(
-               model_.getChannelGroup()[2]).toArray();
+               model_.getChannelGroup2()).toArray();
          // remove presets that are already in use
          String[] usedPresets = model_.getUsedPresets(row);
          String[] comboPresets = new String[presets.length - usedPresets.length];
