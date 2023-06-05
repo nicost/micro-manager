@@ -1,5 +1,6 @@
 package org.micromanager.acquisition.internal.acqengjcompat;
 
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Objects;
@@ -12,6 +13,8 @@ import org.micromanager.acqj.internal.Engine;
 import org.micromanager.acqj.main.AcqEngMetadata;
 import org.micromanager.acqj.main.AcquisitionEvent;
 import org.micromanager.acquisition.ChannelSpec;
+import org.micromanager.acquisition.internal.MMAcquisition;
+import org.micromanager.data.internal.PropertyKey;
 
 
 public class MDAAcqEventModules {
@@ -210,6 +213,10 @@ public class MDAAcqEventModules {
                // posEvent.setAxisPosition(AcqEngMetadata.AXES_GRID_COL,
                //                          positionList.get(index).getGridCol());
                posEvent.setAxisPosition(POSITION_AXIS, index);
+               HashMap<String, String> tags = posEvent.getTags();
+               tags.put(PropertyKey.POSITION_NAME.key(),
+                     positionList.getPosition(index).getLabel());
+               posEvent.setTags(tags);
                builder.accept(posEvent);
             }
          }
