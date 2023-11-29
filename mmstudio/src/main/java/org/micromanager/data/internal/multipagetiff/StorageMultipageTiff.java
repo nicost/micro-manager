@@ -436,9 +436,14 @@ public final class StorageMultipageTiff implements Storage {
       }
 
       if (!positionToFileSet_.containsKey(fileSetIndex)) {
+         String metadataFileName = null;
+         if (separateMetadataFile_) {
+            metadataFileName = store_.getName() + "_metadata.txt";
+         }
          positionToFileSet_.put(fileSetIndex,
                new FileSet(image, this, omeMetadata_,
-                     splitByXYPosition_, fileSetIndex == 0 && separateMetadataFile_));
+                     splitByXYPosition_, fileSetIndex == 0 && separateMetadataFile_,
+                     metadataFileName));
       }
       FileSet set = positionToFileSet_.get(fileSetIndex);
 

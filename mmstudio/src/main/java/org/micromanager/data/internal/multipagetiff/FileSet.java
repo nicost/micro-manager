@@ -55,7 +55,7 @@ class FileSet {
    private String currentTiffFilename_;
    private String currentTiffUUID_;
    private boolean finished_ = false;
-   private final boolean separateMetadataFile_;
+   //private final boolean separateMetadataFile_;
    private final boolean splitByXYPosition_;
    private boolean expectedImageOrder_ = true;
    private int ifdCount_ = 0;
@@ -65,15 +65,20 @@ class FileSet {
    int nextExpectedFrame_ = 0;
    int currentFrame_ = 0;
 
+   private final boolean createMetadataFile_;
+   private final String metadataFileName_;
+
 
    public FileSet(Image firstImage, StorageMultipageTiff masterStorage,
                   OMEMetadata omeMetadata,
-                  boolean splitByXYPosition, boolean separateMetadataFile) throws IOException {
+                  boolean splitByXYPosition,
+                  boolean createMetadataFile, String metadataFileName) throws IOException {
       tiffWriters_ = new LinkedList<>();
       masterStorage_ = masterStorage;
       omeMetadata_ = omeMetadata;
       splitByXYPosition_ = splitByXYPosition;
-      separateMetadataFile_ = separateMetadataFile;
+      createMetadataFile_ = createMetadataFile;
+      metadataFileName_ = metadataFileName;
 
       //get file path and name
       baseFilename_ = createBaseFilename(firstImage);
@@ -83,7 +88,7 @@ class FileSet {
       tiffWriters_.add(new MultipageTiffWriter(masterStorage_,
             firstImage, currentTiffFilename_));
 
-      if (separateMetadataFile_) {
+      if (createMetadataFile_ && metadataFileName_ != null) {
          startMetadataFile();
       }
    }
@@ -105,7 +110,7 @@ class FileSet {
          return;
       }
 
-      if (separateMetadataFile_) {
+      if (createMetadataFile_ && metadataFileName_ != null) {
          finishMetadataFile();
       }
 
@@ -202,13 +207,13 @@ class FileSet {
       int pos = img.getCoords().getStagePosition();
       masterStorage_.updateLastPosition(pos);
 
-      if (separateMetadataFile_) {
+      if (metadataFileName_ != null) {
          writeToMetadataFile(img.getCoords(), img.getMetadata());
       }
       ifdCount_++;
    }
 
-   private void writeToMetadataFile(Coords coords, Metadata md) {
+   private synchronized void writeToMetadataFile(Coords coords, Metadata md) {
       try {
          mdWriter_.write(",\n\"FrameKey-" + coords.getTimePoint()
                + "-" + coords.getChannel() + "-" + coords.getZSlice() + "\": ");
@@ -221,7 +226,7 @@ class FileSet {
 
    private void startMetadataFile() {
       String metadataFileFullPath = masterStorage_.getDiskLocation() + "/"
-            + baseFilename_ + "_metadata.txt";
+              + metadataFileName_;
       PropertyMap summaryPmap = ((DefaultSummaryMetadata) masterStorage_
             .getSummaryMetadata()).toPropertyMap();
       String summaryJSON = NonPropertyMapJSONFormats.summaryMetadata().toJSON(
