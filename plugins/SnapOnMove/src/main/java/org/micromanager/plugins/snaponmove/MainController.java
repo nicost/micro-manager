@@ -224,22 +224,29 @@ class MainController {
 
    private void monitorLoop() {
       try {
+         boolean skipSnap = false;
          initializeMonitoredValues();
          statusAlert_ = studio_.alerts().postUpdatableAlert("Snap-on-Move",
                String.format("Monitoring %d item(s)...", changeCriteria_.size()));
          for (; ; ) {
+            synchronized (pauseLock_) {
+               if (pausedForAcquisition_) {
+                  skipSnap = true;
+                  pauseLock_.wait();
+                  pausedForAcquisition_ = false;
+                  Thread.sleep(250);
+               }
+            }
             lastSnapValues_.clear();
             synchronized (latestValues_) {
                lastSnapValues_.putAll(latestValues_);
             }
-            doSnap();
-            waitForChange();
-            synchronized (pauseLock_) {
-               while (pausedForAcquisition_) {
-                  pauseLock_.wait();
-                  waitForChange();
-               }
+            if (!skipSnap) {
+               doSnap();
+            } else {
+               skipSnap = false;
             }
+            waitForChange();
          }
       } catch (InterruptedException shouldExit) {
          if (statusAlert_ != null) {
@@ -453,15 +460,17 @@ class MainController {
 
    @Subscribe
    public void onAcquisitionStarted(AcquisitionStartedEvent e) {
-      pausedForAcquisition_ = true;
+      synchronized (pauseLock_) {
+         pausedForAcquisition_ = true;
+      }
    }
 
    @Subscribe
    public void onAcquisitionEnded(AcquisitionEndedEvent e) {
       synchronized (pauseLock_) {
+         pausedForAcquisition_ = false;
          pauseLock_.notify();
       }
-      pausedForAcquisition_ = false;
    }
 
    CMMCore getCore() {
