@@ -26,9 +26,12 @@ import com.google.common.eventbus.Subscribe;
 import ij.gui.Roi;
 import java.awt.Rectangle;
 import java.awt.event.ActionEvent;
+import java.io.IOException;
+import java.util.Objects;
 import javax.swing.JPanel;
 import javax.swing.SwingWorker;
 import org.micromanager.Studio;
+import org.micromanager.data.Coords;
 import org.micromanager.data.DataProviderHasNewImageEvent;
 import org.micromanager.data.Image;
 import org.micromanager.data.internal.DefaultImage;
@@ -39,6 +42,7 @@ import org.micromanager.display.inspector.internal.panels.intensity.ImageStatsPu
 import org.micromanager.events.StagePositionChangedEvent;
 import org.micromanager.imageprocessing.ImgSharpnessAnalysis;
 import org.micromanager.internal.utils.MustCallOnEDT;
+import org.micromanager.propertymap.MutablePropertyMapView;
 import org.micromanager.sharpnessinspector.ui.SharpnessInspectorPanel;
 
 /**
@@ -49,6 +53,7 @@ public class SharpnessInspectorController extends AbstractInspectorPanelControll
    // For some reason a whole new instance of this class is created each time we switch display
    // viewers. Having this variable static allows it's value to stay unchanged between instances.
    private static boolean expanded_ = false;
+   private static final String METHOD_KEY = "sharpnessMethod";
    private final SharpnessInspectorPanel panel_;
    private DataViewer viewer_;
    private final Studio studio_;
@@ -57,12 +62,15 @@ public class SharpnessInspectorController extends AbstractInspectorPanelControll
     
    private SharpnessInspectorController(Studio studio) {
       studio_ = studio;
+      final MutablePropertyMapView settings = studio_.profile().getSettings(this.getClass());
       studio_.events().registerForEvents(this);
-      panel_ = new SharpnessInspectorPanel();
-        
+      panel_ = new SharpnessInspectorPanel(this);
+      eval_.setMethod(settings.getStringAsEnum(METHOD_KEY, ImgSharpnessAnalysis.Method.class,
+              ImgSharpnessAnalysis.Method.Redondo));
       panel_.setEvaluationMethod(eval_.getMethod());
       panel_.addPropertyChangeListener("evalMethod", (evt) -> {
          eval_.setMethod((ImgSharpnessAnalysis.Method) evt.getNewValue());
+         settings.putEnumAsString(METHOD_KEY, eval_.getMethod());
       });
         
       panel_.addScanRequestedListener((evt) -> {
@@ -224,6 +232,83 @@ public class SharpnessInspectorController extends AbstractInspectorPanelControll
       } finally {
          this.autoImageEvaluation_ = true;
       }
+   }
+
+   public void evalZ() {
+      this.panel_.clearData();
+      this.panel_.setPlotMode(PlotMode.Z);
+      this.autoImageEvaluation_ = false;
+
+      Roi roi = ((DisplayWindow) viewer_).getImagePlus().getRoi();
+      Rectangle r;
+      if (roi == null || !roi.isArea()) {
+         r = new Rectangle(// use full image fov
+                 ((DisplayWindow) viewer_).getImagePlus().getWidth(),
+                 ((DisplayWindow) viewer_).getImagePlus().getHeight());
+      } else {
+         r = roi.getBounds();
+         //Rectangle must be larger than the kernel used to calculate gradient which is 1x3
+         if (r.width < 5) {
+            r.setSize(5, r.height);
+         }
+         if (r.height < 5) {
+            r.setSize(r.width, 5);
+         }
+      }
+      try {
+         Image img = viewer_.getDisplayedImages().get(0);
+         Coords.Builder baseCoords = img.getCoords().copyRemovingAxes(Coords.Z).copyBuilder();
+         int numZ = viewer_.getDataProvider().getSummaryMetadata().getIntendedDimensions().getZ();
+         boolean useZ = true;
+         Double previousZ = null;
+         for (int i = 0; i < numZ; i++) {
+            Coords coords = baseCoords.z(i).build();
+            Image zImg = viewer_.getDataProvider().getImage(coords);
+            if (Objects.equals(zImg.getMetadata().getZPositionUm(), previousZ)) {
+               useZ = false;
+               break;
+            } else {
+               previousZ = zImg.getMetadata().getZPositionUm();
+            }
+         }
+         for (int i = 0; i < numZ; i++) {
+            Coords coords = baseCoords.z(i).build();
+            Image zImg = viewer_.getDataProvider().getImage(coords);
+            double sharpness = eval_.evaluate(zImg, r);
+            double z = zImg.getMetadata().getZPositionUm();
+            if (useZ) {
+               panel_.setValue(z, System.currentTimeMillis(), sharpness);
+            } else {
+               panel_.setValue(i, System.currentTimeMillis(), sharpness);
+            }
+         }
+      } catch (Exception e) {
+         studio_.logs().showError(e);
+      } finally {
+         this.autoImageEvaluation_ = true;
+      }
+   }
+
+
+   public  double evalImage() {
+      Roi roi;
+      try {
+         roi = ((DisplayWindow) viewer_).getImagePlus().getRoi();
+         // Sometimes when the display window is just getting initialized this occurs due
+         // to a nullpointer in trying to get the ImagePlus
+      } catch (RuntimeException rte) {
+         return 0.0;
+      }
+      try {
+         Image img = viewer_.getDisplayedImages().get(0);
+         if (roi == null || !roi.isArea()) {
+            roi = new Roi(0, 0, img.getWidth(), img.getHeight());
+         }
+         return eval_.evaluate(img, roi.getBounds());
+      } catch (IOException ioe) {
+         studio_.logs().showError(ioe);
+      }
+      return 0.0;
    }
 
    public static class RequestScanEvent extends ActionEvent {

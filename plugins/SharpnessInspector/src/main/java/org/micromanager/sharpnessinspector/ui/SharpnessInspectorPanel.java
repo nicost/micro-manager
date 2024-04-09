@@ -97,6 +97,9 @@ public class SharpnessInspectorPanel extends JPanel {
         
    private final JButton resetButton = new JButton("Reset Plot");
    private final JButton scanButton = new JButton("Scan...");
+   private final JButton evalZButton = new JButton("Evaluate Z");
+   private final JButton calcButton = new JButton("Calculate Now");
+   private final JLabel focusValueLabel;
 
    private final List<SharpnessInspectorController.RequestScanListener> scanRequestedListeners
            = new ArrayList<>();
@@ -114,16 +117,29 @@ public class SharpnessInspectorPanel extends JPanel {
            .getSeries(SERIES_NAME);
 
    private final PropertyChangeSupport pcs = new PropertyChangeSupport(this);
+   private final SharpnessInspectorController sharpnessInspectorController_;
     
-   public SharpnessInspectorPanel() {
+   public SharpnessInspectorPanel(SharpnessInspectorController sharpnessInspectorController) {
       super(new MigLayout("fill, nogrid"));
+      focusValueLabel = new JLabel("0.0");
+      sharpnessInspectorController_ = sharpnessInspectorController;
 
       resetButton.addActionListener((evt) -> {
          this.clearData();
       });
 
       scanButton.addActionListener((evt) -> {
+         this.scanDlg.setLocationRelativeTo(this);
          this.scanDlg.setVisible(true);
+      });
+
+      evalZButton.addActionListener((evt) -> {
+         sharpnessInspectorController_.evalZ();
+      });
+
+      calcButton.addActionListener((evt) -> {
+         double val = sharpnessInspectorController_.evalImage();
+         focusValueLabel.setText(String.valueOf(val));
       });
 
       // A crosshair overlay to display the current z position.
@@ -162,8 +178,7 @@ public class SharpnessInspectorPanel extends JPanel {
       });
 
       evaluationMode.addActionListener((evt) -> {
-         this.pcs.firePropertyChange("evalMethod", null,
-                 (ImgSharpnessAnalysis.Method) evaluationMode.getSelectedItem());
+         this.pcs.firePropertyChange("evalMethod", null, evaluationMode.getSelectedItem());
       });
         
       JButton infoButton = new JButton("?");
@@ -179,10 +194,13 @@ public class SharpnessInspectorPanel extends JPanel {
       super.add(scanButton);
       super.add(resetButton);
       super.add(new JLabel("X axis:"));
-      super.add(plotModeBox, "wrap");
+      super.add(plotModeBox);
+      super.add(evalZButton, "gap left push, al right");
+      super.add(calcButton, "wrap");
       super.add(new JLabel("Method:"));
       super.add(evaluationMode);
       super.add(infoButton);
+      super.add(focusValueLabel, "span 3, gap left push, al right, wrap");
    }
 
    @Override
