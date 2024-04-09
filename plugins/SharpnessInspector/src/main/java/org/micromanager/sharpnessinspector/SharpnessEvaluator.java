@@ -52,31 +52,4 @@ public class SharpnessEvaluator {
       return anl.compute(proc);
    }
     
-   /* Before using the ImgSharpnessAnalysis we used to do it ourselves here
-    private double evaluateGradient(Image img, Rectangle r) {
-        GrayF32 im = new GrayF32(r.width, r.height);
-        for (int i=0; i<r.width; i++) {
-            for (int j=0; j<r.height; j++) {
-                long intensity = img.getIntensityAt(r.x + i, r.y + j);
-                im.set(i, j, (int) intensity);
-            }
-        }
-        GrayF32 blurred = BlurImageOps.gaussian(im, null, -1, 3, null);
-        PixelMath.divide(blurred, ImageStatistics.mean(blurred), blurred); //Normalize?
-        GrayF32 dx = new GrayF32(im.width, im.height);
-        GrayF32 dy = new GrayF32(im.width, im.height);
-        GImageDerivativeOps.gradient(DerivativeType.THREE, blurred, dx, dy, BorderType.EXTENDED);
-        //Calculate magnitude of the gradient
-        PixelMath.pow2(dx, dx);
-        PixelMath.pow2(dy, dy);
-        GrayF32 mag = new GrayF32(dx.width, dx.height);
-        PixelMath.add(dx, dy, mag);
-        PixelMath.sqrt(mag, mag);
-        float[] arr = mag.getData();
-        double[] dubArr = new double[arr.length];
-        for (int i = 0; i < arr.length; i++) { // must convert from float[] to double[]
-            dubArr[i] = arr[i];
-        }
-        return new Percentile().evaluate(dubArr, 95);
-    } */
 }

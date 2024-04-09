@@ -27,6 +27,9 @@ import ij.gui.Roi;
 import java.awt.Rectangle;
 import java.awt.event.ActionEvent;
 import java.io.IOException;
+import java.util.AbstractMap;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
 import javax.swing.JPanel;
 import javax.swing.SwingWorker;
@@ -271,17 +274,34 @@ public class SharpnessInspectorController extends AbstractInspectorPanelControll
                previousZ = zImg.getMetadata().getZPositionUm();
             }
          }
+         int zAtMaxScore = 0;
+         double maxScore = 0;
+         List<AbstractMap.SimpleEntry<Double, Double>> scores = new ArrayList<>();
          for (int i = 0; i < numZ; i++) {
             Coords coords = baseCoords.z(i).build();
             Image zImg = viewer_.getDataProvider().getImage(coords);
             double sharpness = eval_.evaluate(zImg, r);
             double z = zImg.getMetadata().getZPositionUm();
             if (useZ) {
-               panel_.setValue(z, System.currentTimeMillis(), sharpness);
+               //panel_.setValue(z, System.currentTimeMillis(), sharpness);
+               scores.add(new AbstractMap.SimpleEntry<>(z, sharpness));
             } else {
-               panel_.setValue(i, System.currentTimeMillis(), sharpness);
+               //panel_.setValue(i, System.currentTimeMillis(), sharpness);
+               scores.add(new AbstractMap.SimpleEntry<>((double) i, sharpness));
+            }
+            if (i == 0) {
+               maxScore = sharpness;
+            } else if (sharpness > maxScore) {
+               maxScore = sharpness;
+               zAtMaxScore = i;
             }
          }
+         for (AbstractMap.SimpleEntry<Double, Double> entry : scores) {
+            panel_.setValue(entry.getKey(), System.currentTimeMillis(), entry.getValue());
+         }
+         double gaussMax = panel_.findGaussianMax();
+         // panel_.fitZ();
+         panel_.setMaxZLabel((int) Math.round(gaussMax));
       } catch (Exception e) {
          studio_.logs().showError(e);
       } finally {

@@ -44,7 +44,9 @@ import org.jfree.chart.axis.NumberAxis;
 import org.jfree.chart.plot.PlotOrientation;
 import org.jfree.data.xy.XYSeries;
 import org.jfree.data.xy.XYSeriesCollection;
+import org.micromanager.imageprocessing.Fitter;
 import org.micromanager.imageprocessing.ImgSharpnessAnalysis;
+import org.micromanager.internal.utils.NumberUtils;
 import org.micromanager.sharpnessinspector.SharpnessInspectorController;
 import org.micromanager.sharpnessinspector.SharpnessInspectorPlugin;
 
@@ -100,6 +102,7 @@ public class SharpnessInspectorPanel extends JPanel {
    private final JButton evalZButton = new JButton("Evaluate Z");
    private final JButton calcButton = new JButton("Calculate Now");
    private final JLabel focusValueLabel;
+   private final JLabel maxZLabel = new JLabel("Max Z: ");
 
    private final List<SharpnessInspectorController.RequestScanListener> scanRequestedListeners
            = new ArrayList<>();
@@ -121,7 +124,7 @@ public class SharpnessInspectorPanel extends JPanel {
     
    public SharpnessInspectorPanel(SharpnessInspectorController sharpnessInspectorController) {
       super(new MigLayout("fill, nogrid"));
-      focusValueLabel = new JLabel("0.0");
+      focusValueLabel = new JLabel("                       0.0");
       sharpnessInspectorController_ = sharpnessInspectorController;
 
       resetButton.addActionListener((evt) -> {
@@ -139,7 +142,7 @@ public class SharpnessInspectorPanel extends JPanel {
 
       calcButton.addActionListener((evt) -> {
          double val = sharpnessInspectorController_.evalImage();
-         focusValueLabel.setText(String.valueOf(val));
+         focusValueLabel.setText(NumberUtils.doubleToDisplayString(val));
       });
 
       // A crosshair overlay to display the current z position.
@@ -200,7 +203,8 @@ public class SharpnessInspectorPanel extends JPanel {
       super.add(new JLabel("Method:"));
       super.add(evaluationMode);
       super.add(infoButton);
-      super.add(focusValueLabel, "span 3, gap left push, al right, wrap");
+      super.add(maxZLabel, "span 2, gap left push, al right");
+      super.add(focusValueLabel, "wrap");
    }
 
    @Override
@@ -211,6 +215,10 @@ public class SharpnessInspectorPanel extends JPanel {
    @Override
    public void addPropertyChangeListener(String property, PropertyChangeListener listener) {
       this.pcs.addPropertyChangeListener(property, listener);
+   }
+
+   public void setMaxZLabel(int planeAtMaxScore) {
+      this.maxZLabel.setText("Max Z: " + (planeAtMaxScore + 1) + "   ");
    }
     
    public void setValue(double z, double time, double sharpness) {
@@ -235,6 +243,26 @@ public class SharpnessInspectorPanel extends JPanel {
          tDataSeries.delete(0, i);
       }
       this.tDataSeries.addOrUpdate(time, sharpness);
+   }
+
+   public double findGaussianMax() {
+      double[] fitResult = Fitter.fit(this.zDataSeries, Fitter.FunctionType.Gaussian, null);
+      return fitResult[1];
+   }
+
+   public void fitZ() {
+      if (this.zDataSeries.getItemCount() > 3) {
+         double[] fitResult = Fitter.fit(this.zDataSeries, Fitter.FunctionType.Gaussian, null);
+         XYSeries fittedSeries = Fitter.getFittedSeries(this.zDataSeries,
+                 Fitter.FunctionType.Gaussian,
+                 fitResult,
+                 0);
+         zDataSeries.clear();
+         for (int i = 0; i < fittedSeries.getItemCount(); i++) {
+            zDataSeries.addOrUpdate(fittedSeries.getX(i), fittedSeries.getY(i));
+         }
+      }
+      //this.tChart.getXYPlot().setDataset(new XYSeriesCollection(fittedSeries));
    }
     
    public void setZPos(double z) {
