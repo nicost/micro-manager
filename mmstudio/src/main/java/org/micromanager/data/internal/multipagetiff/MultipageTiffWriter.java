@@ -139,6 +139,7 @@ public final class MultipageTiffWriter {
    //Reader associated with this file
    private final MultipageTiffReader reader_;
    private long blankPixelsOffset_ = -1;
+   private IOException thrownException_ = null;
 
    /**
     * Class writing Multipage Tiffs to disk.
@@ -351,17 +352,32 @@ public final class MultipageTiffWriter {
       });
    }
 
-   private void fileChannelWrite(final ByteBuffer[] buffers) {
+   private void fileChannelWrite(final ByteBuffer[] buffers) throws IOException {
+      if (exceptionThrown() != null) {
+         for (ByteBuffer buffer : buffers) {
+            tryRecycleLargeBuffer(buffer);
+         }
+         throw exceptionThrown();
+      }
       executeWritingTask(() -> {
          try {
             fileChannel_.write(buffers);
          } catch (IOException e) {
-            ReportingUtils.logError(e);
-         }
-         for (ByteBuffer buffer : buffers) {
-            tryRecycleLargeBuffer(buffer);
+            registerException(e);
+         } finally {
+            for (ByteBuffer buffer : buffers) {
+               tryRecycleLargeBuffer(buffer);
+            }
          }
       });
+   }
+
+   private void registerException(IOException e) {
+      thrownException_ = e;
+   }
+
+   private IOException exceptionThrown() {
+      return thrownException_;
    }
 
    public MultipageTiffReader getReader() {

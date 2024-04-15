@@ -436,8 +436,10 @@ public final class MultipageTiffReader {
          mdGson = parser.parse(reader);
       } catch (JsonSyntaxException jse) {
          ReportingUtils.logError(jse, "Error parsing image metadata.");
+         reader.close();
          return null;
       }
+      reader.close();
 
       try {
          PropertyMap formatPmap = NonPropertyMapJSONFormats.imageFormat()

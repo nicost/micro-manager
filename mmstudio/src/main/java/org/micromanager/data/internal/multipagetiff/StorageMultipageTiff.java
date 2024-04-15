@@ -330,7 +330,7 @@ public final class StorageMultipageTiff implements Storage {
    }
 
    @Override
-   public void putImage(Image newImage) {
+   public void putImage(Image newImage) throws IOException {
       DefaultImage image = (DefaultImage) newImage;
       // Require images to only have time/channel/z/position axes.
       for (String axis : image.getCoords().getAxes()) {
@@ -351,7 +351,7 @@ public final class StorageMultipageTiff implements Storage {
 
       try {
          writeImage(image, false);
-      } catch (MMException | InterruptedException | ExecutionException | IOException e) {
+      } catch (MMException | InterruptedException | ExecutionException e) {
          ReportingUtils.showError(e, "Failed to write image at " + image.getCoords());
       }
       // index the coords
@@ -449,13 +449,9 @@ public final class StorageMultipageTiff implements Storage {
       }
       FileSet set = positionToFileSet_.get(fileSetIndex);
 
-      try {
-         set.writeImage(image);
-         Coords coords = image.getCoords();
-         coordsToReader_.put(coords, set.getCurrentReader());
-      } catch (IOException ex) {
-         ReportingUtils.showError(ex, "Failed to write image to file.");
-      }
+      set.writeImage(image);
+      Coords coords = image.getCoords();
+      coordsToReader_.put(coords, set.getCurrentReader());
 
       int frame = image.getCoords().getTimePoint();
       lastFrameOpenedDataSet_ = Math.max(frame, lastFrameOpenedDataSet_);
