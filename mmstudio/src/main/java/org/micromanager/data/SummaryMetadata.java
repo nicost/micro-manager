@@ -22,6 +22,7 @@ package org.micromanager.data;
 
 import java.util.List;
 import org.micromanager.MultiStagePosition;
+import org.micromanager.MultiWellPlate;
 import org.micromanager.PropertyMap;
 import org.micromanager.acquisition.SequenceSettings;
 
@@ -102,6 +103,8 @@ public interface SummaryMetadata {
       Builder userData(PropertyMap userData);
 
       Builder sequenceSettings(SequenceSettings sequenceSettings);
+
+      Builder multiWellPlate(MultiWellPlate plate);
 
       Builder imageWidth(Integer width);
 
@@ -340,6 +343,15 @@ public interface SummaryMetadata {
     * @return stage positions that were to be visited in the acquisition
     */
    List<MultiStagePosition> getStagePositionList();
+
+
+   /**
+    * Provides information about the MultiWellPlate used in the acquisition.
+    * Can be null.
+    *
+    * @return MultiWellPlate instance.
+    */
+   MultiWellPlate getMultiWellPlate();
 
    /**
     * Deprecated.
