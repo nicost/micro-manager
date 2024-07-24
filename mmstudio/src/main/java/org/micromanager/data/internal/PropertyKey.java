@@ -1,6 +1,5 @@
 package org.micromanager.data.internal;
 
-import clojure.lang.PersistentTreeMap;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
@@ -25,7 +24,7 @@ import java.util.Map;
 import java.util.Set;
 import org.micromanager.Album;
 import org.micromanager.MultiStagePosition;
-import org.micromanager.MultiWellPlate;
+import org.micromanager.data.MultiWellPlate;
 import org.micromanager.PositionList;
 import org.micromanager.PropertyMap;
 import org.micromanager.PropertyMaps;
