@@ -80,7 +80,7 @@ public class MistFrame extends JFrame {
    private final DisplayWindow ourWindow_;
    private final DataProvider ourProvider_;
    private final Font arialSmallFont_;
-   private final MutablePropertyMapView profileSettings_;
+   protected final MutablePropertyMapView profileSettings_;
    private static final String DIRNAME = "DirName";
    private final Dimension buttonSize_;
    private final JComboBox<String> saveFormat_;
@@ -330,14 +330,18 @@ public class MistFrame extends JFrame {
             }
             final Datastore finalStore = store;
             Runnable runnable =
-                  () -> MistAssembleData.assembleData(studio_,
-                        assembleButton_,
-                        locationsField.getText(),
-                        ourWindow_,
-                        finalStore,
-                        channelList,
-                        mins,
-                        maxes);
+                  () -> {
+                     SwingUtilities.invokeLater(() -> assembleButton_.setEnabled(false));
+                     MistAssembleData.assembleData(studio_,
+                           this,
+                           locationsField.getText(),
+                           ourWindow_,
+                           finalStore,
+                           channelList,
+                           mins,
+                           maxes);
+                     SwingUtilities.invokeLater(() -> assembleButton_.setEnabled(true));
+                  };
             new Thread(runnable).start();
          } catch (IOException ioe) {
             studio_.logs().showError("Error creating new data store: " + ioe.getMessage());

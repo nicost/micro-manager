@@ -10,7 +10,6 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import javax.swing.JButton;
 import javax.swing.ProgressMonitor;
 import javax.swing.SwingUtilities;
 import org.micromanager.MultiStagePosition;
@@ -32,6 +31,14 @@ public class MistAssembleData {
       Grid        // Created by Create Grid in StagePositionList
    }
 
+   private enum BlendMode {
+      None,       // No blending
+      Average,    // Average of all images
+      Alpha      // Calculate alpha based on distance to center and
+      // float alpha = a / (a + b);
+      // actual blending: alpha*A + (1 - aalpha)*B
+   }
+
    /**
     * This function can take a long, long time to execute.  Make sure not to call it on the EDT.
     *
@@ -40,7 +47,7 @@ public class MistAssembleData {
     * @param newStore Datastore to write the stitched images to.
     */
    public static void assembleData(Studio studio,
-                                   JButton button,
+                                   MistFrame frame,
                                    String locationsFile,
                                    final DataViewer dataViewer,
                                    Datastore newStore,
@@ -162,8 +169,6 @@ public class MistAssembleData {
          return;
       }
 
-      SwingUtilities.invokeLater(() -> button.setEnabled(false));
-
       // calculate new image dimensions
       int imWidth = dp.getSummaryMetadata().getImageWidth();
       int imHeight = dp.getSummaryMetadata().getImageHeight();
@@ -189,7 +194,7 @@ public class MistAssembleData {
       final int newNrP = dp.getSummaryMetadata().getIntendedDimensions().getP()
             / mistEntries.size();
       int maxNumImages = newNrC * newNrT * newNrZ * newNrP;
-      ProgressMonitor monitor = new ProgressMonitor(this,
+      ProgressMonitor monitor = new ProgressMonitor(frame,
             "Stitching images...", null, 0, maxNumImages);
       DataViewer newDataViewer = null;
       long startTime = System.currentTimeMillis();
@@ -200,7 +205,7 @@ public class MistAssembleData {
          newStore.setSummaryMetadata(dp.getSummaryMetadata().copyBuilder().imageHeight(newHeight)
                .imageWidth(newWidth).intendedDimensions(cb.build())
                .build());
-         if (profileSettings_.getBoolean("shouldDisplay", true)) {
+         if (frame.profileSettings_.getBoolean("shouldDisplay", true)) {
             newDataViewer = studio.displays().createDisplay(newStore);
          }
          Coords id = dp.getSummaryMetadata().getIntendedDimensions();
@@ -221,18 +226,17 @@ public class MistAssembleData {
                   break;
                }
                tmpC++;
-               for (int t = mins.getOrDefault(Coords.T, 0);
-                    t <= maxes.getOrDefault(Coords.T, 0);
-                    t++) {
-                  for (int z = mins.getOrDefault(Coords.Z, 0);
-                       z <= maxes.getOrDefault(Coords.Z, 0);
-                       z++) {
+               for (int t = mins.getOrDefault(Coords.T, 0)
+                     ; t <= maxes.getOrDefault(Coords.T, 0)
+                     ; t++) {
+                  for (int z = mins.getOrDefault(Coords.Z, 0)
+                        ; z <= maxes.getOrDefault(Coords.Z, 0)
+                        ; z++) {
                      if (monitor.isCanceled()) {
                         newStore.freeze();
                         if (newDataViewer == null) {
                            newStore.close();
                         }
-                        SwingUtilities.invokeLater(() -> button.setEnabled(true));
                         return;
                      }
                      ImagePlus newImgPlus = IJ.createImage(
@@ -244,7 +248,6 @@ public class MistAssembleData {
                            if (newDataViewer == null) {
                               newStore.close();
                            }
-                           SwingUtilities.invokeLater(() -> button.setEnabled(true));
                            return;
                         }
                         Image img = null;
@@ -278,7 +281,6 @@ public class MistAssembleData {
                            }
                            if (msg == null) {
                               studio.logs().showError("Did not find specified image");
-                              SwingUtilities.invokeLater(() -> button.setEnabled(true));
                               return;
                            }
                            ImageProcessor ip = DefaultImageJConverter.createProcessor(img,
@@ -322,7 +324,6 @@ public class MistAssembleData {
 
          SwingUtilities.invokeLater(() -> {
             SwingUtilities.invokeLater(() -> monitor.setProgress(maxNumImages));
-            button.setEnabled(true);
          });
       }
    }
