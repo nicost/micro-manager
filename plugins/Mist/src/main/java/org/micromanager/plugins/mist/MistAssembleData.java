@@ -21,6 +21,10 @@ import org.micromanager.data.Datastore;
 import org.micromanager.data.Image;
 import org.micromanager.data.internal.DefaultImageJConverter;
 import org.micromanager.display.DataViewer;
+import org.micromanager.imageprocessing.mist.lib.common.Array2DView;
+import org.micromanager.imageprocessing.mist.lib.export.tileblender.TileBlender;
+import org.micromanager.imageprocessing.mist.lib.imagetile.ImageTile;
+import org.micromanager.imageprocessing.mist.lib.imagetile.java.JavaImageTile;
 
 public class MistAssembleData {
 
@@ -56,6 +60,7 @@ public class MistAssembleData {
                                    Map<String, Integer> maxes) {
       List<MistGlobalData> mistEntries = new ArrayList<>();
       PositionConvention positionConvention = PositionConvention.NotFound;
+      TileGrid<T> grid = new TileGrid<T>(gridWidth, gridHeight, startRow, startCol);
 
       File mistFile = new File(locationsFile);
       if (!mistFile.exists()) {
@@ -285,6 +290,13 @@ public class MistAssembleData {
                            }
                            ImageProcessor ip = DefaultImageJConverter.createProcessor(img,
                                  false);
+                           // create an Array2DView of this imageprocessor to be used in blending
+                           ImageTile<float[][]> tile = new JavaImageTile(
+                                 ip, msg.getPositionX(), msg.getPositionY(), 1.0);
+                           Array2DView array2DView = new Array2DView(tile, msg.getPositionX(),
+                                 ip.getWidth(), msg.getPositionY(), ip.getHeight());
+
+
                            newImgPlus.getProcessor().insert(ip, msg.getPositionX(),
                                  msg.getPositionY());
                         }

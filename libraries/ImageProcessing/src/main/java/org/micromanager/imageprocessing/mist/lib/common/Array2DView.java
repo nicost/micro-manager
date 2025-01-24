@@ -53,14 +53,16 @@ import org.micromanager.imageprocessing.mist.lib.imagetile.ImageTile;
  * Utility for viewing an image tile two dimensionally, given a starting row, col, height, and
  * width.
  *
- * <p> The tile's data is accessed as:
+ * <p>
+ * The tile's data is accessed as:
  *
  * <pre>
  * <code> (row + startRow) * dataWidth + (col + startCol)
  * </code>
  * </pre>
  *
- * <p> The class is used mainly to compute regions for CCF computation, but has been
+ * <p>
+ * The class is used mainly to compute regions for CCF computation, but has been
  * adapted into the visualizer as well for writing data to a writeable raster.
  *
  * @author Tim Blattner
@@ -222,11 +224,12 @@ public class Array2DView {
     * Writes the entire view into a raster from an x and y location
     *
     * @param raster the raster you are writing to
-    * @param x      the x index inside of the raster
-    * @param y      the y index inside of the rasters
+    * @param x      the x index inside the raster
+    * @param y      the y index inside the rasters
     */
    public void writeViewData(WritableRaster raster, int x, int y) {
-      // Log.msg(LogType.VERBOSE, "x : " + x + " y: " + y + " viewHeight: " + this.viewHeight + " viewWidth: " + this.viewWidth);
+      /* Log.msg(LogType.VERBOSE, "x : " + x + " y: " + y + " viewHeight: " + this.viewHeight
+         + " viewWidth: " + this.viewWidth); */
 
       for (int row = 0; row < this.viewHeight; row++) {
          for (int col = 0; col < this.viewWidth; col++) {
