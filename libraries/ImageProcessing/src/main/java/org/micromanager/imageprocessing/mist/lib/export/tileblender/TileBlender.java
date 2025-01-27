@@ -47,15 +47,15 @@ package org.micromanager.imageprocessing.mist.lib.export.tileblender;
 
 import ij.ImagePlus;
 import ij.process.ByteProcessor;
+import ij.process.ColorProcessor;
 import ij.process.FloatProcessor;
 import ij.process.ImageProcessor;
+import ij.process.ShortProcessor;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.FloatBuffer;
 import java.nio.ShortBuffer;
-
-import ij.process.ShortProcessor;
 import loci.formats.FormatException;
 import loci.formats.out.OMETiffWriter;
 import org.micromanager.imageprocessing.mist.lib.common.Array2DView;
@@ -63,7 +63,7 @@ import org.micromanager.imageprocessing.mist.lib.imagetile.ImageTile;
 
 
 /**
- * Blending interface for tiles
+ * Blending interface for tiles.
  *
  * @author Tim Blattner
  * @version 1.0
@@ -106,7 +106,7 @@ public abstract class TileBlender {
    private void convertDefaultProcessor(Object pixels) {
       switch (bytesPerPixel) {
          case 1:
-//        this.buffer.put((byte[])pixels);
+            this.buffer.put((byte[]) pixels);
             break;
          case 2:
             ShortBuffer shortBuffer = this.buffer.asShortBuffer();
@@ -129,7 +129,7 @@ public abstract class TileBlender {
 
       switch (imageType) {
          case ImagePlus.GRAY8:
-//        this.ip = new ByteProcessor(tileSizeX, tileSizeY);
+            this.ip = new ByteProcessor(tileSizeX, tileSizeY);
             this.numChannels = 1;
             break;
          case ImagePlus.GRAY16:
@@ -141,7 +141,7 @@ public abstract class TileBlender {
             this.numChannels = 1;
             break;
          case ImagePlus.COLOR_RGB:
-//        this.ip = new ColorProcessor(tileSizeX, tileSizeY);
+            this.ip = new ColorProcessor(tileSizeX, tileSizeY);
             this.numChannels = 3;
             break;
          default:
@@ -153,7 +153,7 @@ public abstract class TileBlender {
    }
 
    /**
-    * Initializes the blending function
+    * Initializes the blending function.
     *
     * @param tileSizeX the tile size along X dimension (width)
     * @param tileSizeY the tile size along Y dimension (height)
@@ -161,7 +161,7 @@ public abstract class TileBlender {
    public abstract void initBlender(int tileSizeX, int tileSizeY);
 
    /**
-    * Blends a pixel array into the final image
+    * Blends a pixel array into the final image.
     *
     * @param x      the current x position in the final image
     * @param y      the current y position in the final image
@@ -227,10 +227,6 @@ public abstract class TileBlender {
 
       omeTiffWriter.saveBytes(0, this.buffer.array(), tileX, tileY, tileXSize, tileYSize);
    }
-
-//  public ImageProcessor getIp() {
-//    return ip;
-//  }
 
    public int getTileWidth() {
       return this.tileWidth;

@@ -5,7 +5,6 @@
 // You are solely responsible for determining the appropriateness of using and distributing the software and you assume all risks associated with its use, including but not limited to the risks and costs of program errors, compliance with applicable laws, damage to or loss of data, programs or equipment, and the unavailability or interruption of operation. This software is not intended to be used in any situation where a failure could cause risk of injury or damage to property. The software developed by NIST employees is not subject to copyright protection within the United States.
 
 
-
 // ================================================================
 //
 // Author: tjb3
@@ -21,6 +20,7 @@ package org.micromanager.imageprocessing.mist.lib.imagetile.java;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+
 import org.micromanager.imageprocessing.mist.lib.common.CorrelationTriple;
 import org.micromanager.imageprocessing.mist.lib.imagetile.java.JavaImageTile;
 import org.micromanager.imageprocessing.mist.lib.imagetile.memory.TileWorkerMemory;
@@ -32,17 +32,17 @@ import org.micromanager.imageprocessing.mist.lib.imagetile.memory.TileWorkerMemo
  */
 public class JavaStitching {
 
-  /**
-   * Computes the phase correlation image alignment between two images
-   *
-   * @param t1     image 1
-   * @param t2     image 2
-   * @param memory the tile worker memory
-   * @return the best relative displacement along the x and y axis and the correlation between two
-   * images
-   */
+   /**
+    * Computes the phase correlation image alignment between two images
+    *
+    * @param t1     image 1
+    * @param t2     image 2
+    * @param memory the tile worker memory
+    * @return the best relative displacement along the x and y axis and the correlation between two
+    * images
+    */
    public static CorrelationTriple phaseCorrelationImageAlignment(JavaImageTile t1,
-                                    JavaImageTile t2, TileWorkerMemory memory) {
+                                                                  JavaImageTile t2, TileWorkerMemory memory) {
       // If one of the two images does not exists, then a translation cannot exist
       if (!t1.fileExists() || !t2.fileExists()) {
          return new CorrelationTriple(-1.0, 0, 0);
@@ -52,47 +52,47 @@ public class JavaStitching {
       float[][] pcm = memory.getArrayMemory();
       pcm = peakCorrelationMatrix(t1, t2, pcm);
 
-    List<CorrelationTriple> peaks =
-        UtilFnsStitching.multiPeakCorrelationMatrixNoSort(pcm, Stitching.NUM_PEAKS, t1.getWidth(),
-            t2.getHeight());
-    List<CorrelationTriple> multi_ccfs = new ArrayList<CorrelationTriple>(Stitching.NUM_PEAKS);
-    for (int i = 0; i < peaks.size(); i++) {
-      if (t1.isSameRowAs(t2))
-        multi_ccfs.add(Stitching.peakCrossCorrelationLR(t1, t2, peaks.get(i).getX(), peaks.get(i)
-            .getY()));
-      else if (t1.isSameColAs(t2))
-        multi_ccfs.add(Stitching.peakCrossCorrelationUD(t1, t2, peaks.get(i).getX(), peaks.get(i)
-            .getY()));
-      Debug.msg(DebugType.INFO, multi_ccfs.get(i).toString());
+      List<CorrelationTriple> peaks =
+            UtilFnsStitching.multiPeakCorrelationMatrixNoSort(pcm, Stitching.NUM_PEAKS, t1.getWidth(),
+                  t2.getHeight());
+      List<CorrelationTriple> multi_ccfs = new ArrayList<CorrelationTriple>(Stitching.NUM_PEAKS);
+      for (int i = 0; i < peaks.size(); i++) {
+         if (t1.isSameRowAs(t2))
+            multi_ccfs.add(Stitching.peakCrossCorrelationLR(t1, t2, peaks.get(i).getX(), peaks.get(i)
+                  .getY()));
+         else if (t1.isSameColAs(t2))
+            multi_ccfs.add(Stitching.peakCrossCorrelationUD(t1, t2, peaks.get(i).getX(), peaks.get(i)
+                  .getY()));
+         Debug.msg(DebugType.INFO, multi_ccfs.get(i).toString());
 
-    }
+      }
 
-    return Collections.max(multi_ccfs);
+      return Collections.max(multi_ccfs);
 
-  }
+   }
 
 
-  /**
-   * Computes the peak correlation matrix between two images
-   *
-   * @param t1  image 1
-   * @param t2  image 2
-   * @param ncc the normalized cross correlation matrix
-   * @return the peak correlation matrix
-   */
-  public static float[][] peakCorrelationMatrix(JavaImageTile t1, JavaImageTile t2, float[][] ncc) {
-    if (!t1.hasFft())
-      t1.computeFft();
+   /**
+    * Computes the peak correlation matrix between two images
+    *
+    * @param t1  image 1
+    * @param t2  image 2
+    * @param ncc the normalized cross correlation matrix
+    * @return the peak correlation matrix
+    */
+   public static float[][] peakCorrelationMatrix(JavaImageTile t1, JavaImageTile t2, float[][] ncc) {
+      if (!t1.hasFft())
+         t1.computeFft();
 
-    if (!t2.hasFft())
-      t2.computeFft();
+      if (!t2.hasFft())
+         t2.computeFft();
 
-    ncc = UtilFnsStitching.computePhaseCorrelationJava(t1.getFft(), t2.getFft(), ncc);
+      ncc = UtilFnsStitching.computePhaseCorrelationJava(t1.getFft(), t2.getFft(), ncc);
 
-    ncc = JavaImageTile.fftPlan.applyInverse(ncc);
+      ncc = JavaImageTile.fftPlan.applyInverse(ncc);
 
-    return ncc;
-  }
+      return ncc;
+   }
 
 
 }

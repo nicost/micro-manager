@@ -12,7 +12,6 @@
 
 package org.micromanager.imageprocessing.mist.lib.tilegrid.loader;
 
-import org.micromanager.imageprocessing.mist.lib.tilegrid.loader.TileGridLoader;
 
 /**
  * Row column tile grid loader
