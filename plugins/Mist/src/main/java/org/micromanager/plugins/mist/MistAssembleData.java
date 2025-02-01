@@ -21,10 +21,8 @@ import org.micromanager.data.Datastore;
 import org.micromanager.data.Image;
 import org.micromanager.data.internal.DefaultImageJConverter;
 import org.micromanager.display.DataViewer;
-import org.micromanager.imageprocessing.mist.lib.common.Array2DView;
-import org.micromanager.imageprocessing.mist.lib.export.tileblender.TileBlender;
-import org.micromanager.imageprocessing.mist.lib.imagetile.ImageTile;
-import org.micromanager.imageprocessing.mist.lib.imagetile.java.JavaImageTile;
+import org.micromanager.plugins.mist.lib.ImageTile;
+import org.micromanager.plugins.mist.lib.TileGrid;
 
 public class MistAssembleData {
 
@@ -60,7 +58,6 @@ public class MistAssembleData {
                                    Map<String, Integer> maxes) {
       List<MistGlobalData> mistEntries = new ArrayList<>();
       PositionConvention positionConvention = PositionConvention.NotFound;
-      TileGrid<T> grid = new TileGrid<T>(gridWidth, gridHeight, startRow, startCol);
 
       File mistFile = new File(locationsFile);
       if (!mistFile.exists()) {
@@ -188,6 +185,7 @@ public class MistAssembleData {
          }
       }
 
+
       int newWidth = maxX + imWidth;
       int newHeight = maxY + imHeight;
 
@@ -247,6 +245,7 @@ public class MistAssembleData {
                      ImagePlus newImgPlus = IJ.createImage(
                            "Stitched image-" + newP, "16-bit black", newWidth, newHeight, 2);
                      boolean imgAdded = false;
+                     TileGrid tileGrid = new TileGrid(imWidth, imHeight);
                      for (int p = 0; p < mistEntries.size(); p++) {
                         if (monitor.isCanceled()) {
                            newStore.freeze();
@@ -288,6 +287,11 @@ public class MistAssembleData {
                               studio.logs().showError("Did not find specified image");
                               return;
                            }
+                           ImageTile tile = new ImageTile(dp, coords, msg.getPositionX(),
+                                 msg.getPositionY());
+                           tileGrid.setTile(msg.getRowNr(), msg.getColNr(), tile);
+
+                           /*
                            ImageProcessor ip = DefaultImageJConverter.createProcessor(img,
                                  false);
                            // create an Array2DView of this imageprocessor to be used in blending
@@ -296,11 +300,14 @@ public class MistAssembleData {
                            Array2DView array2DView = new Array2DView(tile, msg.getPositionX(),
                                  ip.getWidth(), msg.getPositionY(), ip.getHeight());
 
-
                            newImgPlus.getProcessor().insert(ip, msg.getPositionX(),
                                  msg.getPositionY());
+                            */
                         }
                      }
+                     tileGrid.assignNeighbors();
+                     tileGrid.placeTiles(newImgPlus.getProcessor());
+
                      if (imgAdded) {
                         Image newImg = studio.data().ij().createImage(newImgPlus.getProcessor(),
                               imgCb.c(tmpC).t(t - mins.getOrDefault(Coords.T, 0))
