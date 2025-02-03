@@ -185,8 +185,16 @@ public class TileGrid {
 
                // south and east corner
                {
-               int xStart = east.getTileOriginX() - tile.getTileOriginX();
-               int yStart = south.getTileOriginY() - tile.getTileOriginY();
+               int tileOriginX = east.getTileOriginX();
+               if (tileOriginX > southEast.getTileOriginX()) {
+                  tileOriginX = southEast.getTileOriginX();
+               }
+               int xStart = tileOriginX - tile.getTileOriginX();
+               int tileOriginY = south.getTileOriginY();
+               if (tileOriginY > southEast.getTileOriginY()) {
+                  tileOriginY = southEast.getTileOriginY();
+               }
+               int yStart = tileOriginY - tile.getTileOriginY();
                int largeXStart = tile.getTileOriginX() + xStart;
                int largeYStart = tile.getTileOriginY() + yStart;
                int xLength = tile.getImage().getWidth() - xStart;
@@ -200,6 +208,12 @@ public class TileGrid {
                         continue;
                      }
                      int tileValue = tileProc.get(x + xStart, y - yStart);
+                     Integer southValue = null;
+                     Integer eastValue = null;
+                     Integer southEastValue = null;
+                     int largeX = x + largeXStart;
+                     int largeY = y
+                     if (largeXStart + x
                      int southValue = southProc.get(x, y);
                      if (mode == BlendMode.LINEAR) {
                         double tileWeight = lookupTable[x + xStart][y + yStart];
@@ -207,14 +221,14 @@ public class TileGrid {
                         double weight = tileWeight + southWeight;
                         double sums = tileWeight * tileValue + southWeight * southValue;
                         int value = (int) (sums / weight);
-                        largeIp.set(x + largeXStart, y + largeYStart, value);
+                        largeIp.set( largeX, y + largeYStart, value);
                      } else if (mode == BlendMode.AVERAGE) {
                         int value = (tileValue + southValue) / 2;
                         largeIp.set(x + largeXStart, y + largeYStart, value);
                      }
                   }
                }
-            }
+               }
 
          }
       }
