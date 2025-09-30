@@ -23,6 +23,7 @@ import javax.swing.JSeparator;
 import javax.swing.JSpinner;
 import javax.swing.JTextField;
 import javax.swing.ProgressMonitor;
+import javax.swing.SpinnerNumberModel;
 import javax.swing.SwingUtilities;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
@@ -330,6 +331,21 @@ public class DeskewFrame extends JFrame implements ProcessorConfigurator {
          updateUIBasedOnAcquisitionSettings(studio_.acquisitions().getAcquisitionSettings());
       }
       manageMDASync(syncWithMDA.isSelected());
+
+      add(new JSeparator(), "span 5, growx, wrap");
+
+      add(new JLabel("Acquire Test Overview:"), "wrap");
+      add(new JLabel("Rows:"), "span 4, split 4, align left");
+      SpinnerNumberModel rowsModel =
+            new SpinnerNumberModel(settings_.getInteger("OverviewRows", 3), 1, 30, 1);
+      add(new JSpinner(rowsModel));
+      add(new JLabel("Columns:"));
+      SpinnerNumberModel columnsModel =
+               new SpinnerNumberModel(settings_.getInteger("OverviewColumns", 3), 1, 30, 1);
+      add(new JSpinner(columnsModel));
+      JButton acquireButton = new JButton("Acquire Overview");
+      acquireButton.addActionListener(e -> { });
+      add(acquireButton, "push, align right, wrap");
 
       add(new JSeparator(), "span 5, growx, wrap");
 
