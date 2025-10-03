@@ -1,6 +1,5 @@
 package org.micromanager.acquisition.internal.acqengjcompat;
 
-import clojure.lang.Obj;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.HashMap;

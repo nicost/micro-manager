@@ -244,7 +244,7 @@ public final class MMAcquisition extends DataViewerListener {
       studio_.events().registerForEvents(this);
 
       // start thread reporting when next frame will be taken
-      if (callbacks.getFrameIntervalMs() > 5000) {
+      if (callbacks != null && callbacks.getFrameIntervalMs() > 5000) {
          nextFrameAlertGenerator_ = new Timer(1000, (ActionEvent e) -> {
             if (callbacks.isAcquisitionRunning()) {
                setNextImageAlert(callbacks);
@@ -293,6 +293,9 @@ public final class MMAcquisition extends DataViewerListener {
    public boolean canCloseViewer(DataViewer viewer) {
       if (!viewer.equals(display_)) {
          ReportingUtils.logError("MMAcquisition: received callback from unknown viewer");
+         return true;
+      }
+      if (callbacks_ == null) {
          return true;
       }
       // NS 20241128: I do not understand the logic here.
