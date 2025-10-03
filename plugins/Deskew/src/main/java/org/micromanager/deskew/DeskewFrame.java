@@ -338,13 +338,20 @@ public class DeskewFrame extends JFrame implements ProcessorConfigurator {
       add(new JLabel("Rows:"), "span 4, split 4, align left");
       SpinnerNumberModel rowsModel =
             new SpinnerNumberModel(settings_.getInteger("OverviewRows", 3), 1, 30, 1);
-      add(new JSpinner(rowsModel));
+      final JSpinner rowsSpinner = new JSpinner(rowsModel);
+      add(rowsSpinner);
       add(new JLabel("Columns:"));
       SpinnerNumberModel columnsModel =
                new SpinnerNumberModel(settings_.getInteger("OverviewColumns", 3), 1, 30, 1);
-      add(new JSpinner(columnsModel));
+      final JSpinner columnsSpinner = new JSpinner(columnsModel);
+      add(columnsSpinner);
       JButton acquireButton = new JButton("Acquire Overview");
-      acquireButton.addActionListener(e -> { });
+      acquireButton.addActionListener(e -> {
+         DeskewOverviewAcq dacq = new DeskewOverviewAcq(studio_,
+                  (Integer) rowsSpinner.getValue(),
+                  (Integer) columnsSpinner.getValue());
+         dacq.run();
+      });
       add(acquireButton, "push, align right, wrap");
 
       add(new JSeparator(), "span 5, growx, wrap");
