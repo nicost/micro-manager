@@ -194,6 +194,14 @@ public final class StatsComputeQueue {
                   storedStats_.set(p, null);
                }
                storedStats_.set(priority, result);
+
+               // Limit stored stats to prevent unbounded memory growth
+               // Keep only the most recent 10 priority levels
+               final int MAX_STORED_STATS = 10;
+               if (storedStats_.size() > MAX_STORED_STATS) {
+                  // Remove oldest entries (lowest indices)
+                  storedStats_.subList(0, storedStats_.size() - MAX_STORED_STATS).clear();
+               }
             }
          }
       }));

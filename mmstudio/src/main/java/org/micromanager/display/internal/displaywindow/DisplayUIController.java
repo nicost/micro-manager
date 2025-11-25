@@ -856,6 +856,8 @@ public final class DisplayUIController implements Closeable, WindowListener,
          setupDisplayUI(images);  // creates ijBridge amongst other things
       }
 
+      // Clear old reference to allow GC to reclaim memory from previous images
+      displayedImages_ = null;
       displayedImages_ = images;
       Coords nominalCoords = images.getRequest().getNominalCoords();
 

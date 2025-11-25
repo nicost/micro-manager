@@ -139,6 +139,10 @@ public final class DisplayController extends DisplayWindowAPIAdapter
    private CoalescentEDTRunnablePool runnablePool_ =
          CoalescentEDTRunnablePool.create();
 
+   // Track pending display runnables to prevent memory accumulation
+   private final AtomicInteger pendingDisplayRunnables_ = new AtomicInteger(0);
+   private static final int MAX_PENDING_DISPLAYS = 5;
+
    private PerformanceMonitor perfMon_
          = PerformanceMonitor.createWithTimeConstantMs(1000.0);
 
@@ -350,6 +354,16 @@ public final class DisplayController extends DisplayWindowAPIAdapter
    private void scheduleDisplayInUI(final ImagesAndStats images) {
       Preconditions.checkArgument(images.getRequest().getNumberOfImages() > 0);
 
+      // Check if too many display runnables are pending to prevent memory buildup
+      if (pendingDisplayRunnables_.get() >= MAX_PENDING_DISPLAYS) {
+         if (perfMon_ != null) {
+            perfMon_.sampleTimeInterval("Display scheduling skipped - queue full");
+         }
+         return;  // Skip this display update to prevent memory accumulation
+      }
+
+      pendingDisplayRunnables_.incrementAndGet();
+
       // A note about congestion of event queue by excessive paint events:
       //
       // We know from experience (since Micro-Manager 1.4) that scheduling
@@ -389,67 +403,74 @@ public final class DisplayController extends DisplayWindowAPIAdapter
 
          @Override
          public void run() {
-            if (uiController_ == null) { // Closed
-               return;
-            }
+            try {
+               if (uiController_ == null) { // Closed
+                  return;
+               }
 
-            Image primaryImage = images.getRequest().getImage(0);
-            Coords nominalCoords = images.getRequest().getNominalCoords();
-            if (nominalCoords.hasAxis(Coords.CHANNEL)) {
-               int channel = nominalCoords.getChannel();
-               for (Image image : images.getRequest().getImages()) {
-                  if (image.getCoords().hasAxis(Coords.CHANNEL)
-                        && image.getCoords().getChannel() == channel) {
-                     primaryImage = image;
-                     break;
+               Image primaryImage = images.getRequest().getImage(0);
+               Coords nominalCoords = images.getRequest().getNominalCoords();
+               if (nominalCoords.hasAxis(Coords.CHANNEL)) {
+                  int channel = nominalCoords.getChannel();
+                  for (Image image : images.getRequest().getImages()) {
+                     if (image.getCoords().hasAxis(Coords.CHANNEL)
+                           && image.getCoords().getChannel() == channel) {
+                        primaryImage = image;
+                        break;
+                     }
                   }
                }
-            }
 
-            boolean imagesDiffer = true;
-            if (displayedImages_ != null
-                  && images.getRequest().getNumberOfImages()
-                  == displayedImages_.getRequest().getNumberOfImages()) {
-               imagesDiffer = false;
-               for (int i = 0; i < images.getRequest().getNumberOfImages(); ++i) {
-                  if (images.getRequest().getImage(i)
-                        != displayedImages_.getRequest().getImage(i)) {
-                     imagesDiffer = true;
-                     break;
+               boolean imagesDiffer = true;
+               if (displayedImages_ != null
+                     && images.getRequest().getNumberOfImages()
+                     == displayedImages_.getRequest().getNumberOfImages()) {
+                  imagesDiffer = false;
+                  for (int i = 0; i < images.getRequest().getNumberOfImages(); ++i) {
+                     if (images.getRequest().getImage(i)
+                           != displayedImages_.getRequest().getImage(i)) {
+                        imagesDiffer = true;
+                        break;
+                     }
                   }
                }
-            }
 
-            if (perfMon_ != null) {
-               perfMon_.sample("Scheduling identical images (%)", imagesDiffer ? 0.0 : 100.0);
-            }
-            if (imagesDiffer || getDisplaySettings().isAutostretchEnabled()
-                  || getDisplaySettings().getColorMode()
-                  != DisplaySettings.ColorMode.COMPOSITE) {
-               uiController_.displayImages(images);
-            } else if (getDisplaySettings().getColorMode()
-                  == DisplaySettings.ColorMode.COMPOSITE) {
-               // in composite mode, keep the channel name in sync with the 
-               // channel set by the slider.  It would be even better to 
-               // disable the channel slider and display the names of all 
-               // channels, but that becomes very hacky
-               uiController_.updateSliders(images);
-               uiController_.setImageInfoLabel(images);
-            }
+               if (perfMon_ != null) {
+                  perfMon_.sample("Scheduling identical images (%)", imagesDiffer ? 0.0 : 100.0);
+               }
+               if (imagesDiffer || getDisplaySettings().isAutostretchEnabled()
+                     || getDisplaySettings().getColorMode()
+                     != DisplaySettings.ColorMode.COMPOSITE) {
+                  uiController_.displayImages(images);
+               } else if (getDisplaySettings().getColorMode()
+                     == DisplaySettings.ColorMode.COMPOSITE) {
+                  // in composite mode, keep the channel name in sync with the
+                  // channel set by the slider.  It would be even better to
+                  // disable the channel slider and display the names of all
+                  // channels, but that becomes very hacky
+                  uiController_.updateSliders(images);
+                  uiController_.setImageInfoLabel(images);
+               }
 
-            postEvent(DefaultDisplayDidShowImageEvent.create(
-                  DisplayController.this,
-                  images.getRequest().getImages(),
-                  primaryImage));
+               postEvent(DefaultDisplayDidShowImageEvent.create(
+                     DisplayController.this,
+                     images.getRequest().getImages(),
+                     primaryImage));
 
-            if (images.getStatsSequenceNumber() > latestStatsSeqNr_) {
-               postEvent(ImageStatsChangedEvent.create(images));
-               latestStatsSeqNr_ = images.getStatsSequenceNumber();
-            }
-            displayedImages_ = images;
+               if (images.getStatsSequenceNumber() > latestStatsSeqNr_) {
+                  postEvent(ImageStatsChangedEvent.create(images));
+                  latestStatsSeqNr_ = images.getStatsSequenceNumber();
+               }
+               // Clear old reference to allow GC to reclaim memory from previous images
+               displayedImages_ = null;
+               displayedImages_ = images;
 
-            if (perfMon_ != null) {
-               perfMon_.sampleTimeInterval("Scheduled repaint on EDT");
+               if (perfMon_ != null) {
+                  perfMon_.sampleTimeInterval("Scheduled repaint on EDT");
+               }
+            } finally {
+               // Decrement counter to allow new display updates
+               pendingDisplayRunnables_.decrementAndGet();
             }
          }
       });
