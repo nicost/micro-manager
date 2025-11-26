@@ -21,6 +21,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import org.apache.commons.lang3.event.EventListenerSupport;
+import org.micromanager.data.Coords;
 import org.micromanager.internal.utils.ThreadFactoryFactory;
 import org.micromanager.internal.utils.performance.PerformanceMonitor;
 
@@ -64,12 +65,12 @@ public final class StatsComputeQueue {
    private final List<Future<?>> bypassFutures_ =
          new ArrayList<Future<?>>();
 
-   // Outstanding results by priority. We keep 2 slots per priority, to provide
-   // some buffering (otherwise we'll always be as slow as downstream)
+   // Outstanding results by priority. We keep 1 slot per priority and always
+   // replace with the latest to avoid falling behind during high-speed acquisition
    // Guarded by monitor on this
    private final List<Deque<Future<?>>> resultFutures_ =
          new ArrayList<Deque<Future<?>>>();
-   private static final int RESULT_BUFFER_SIZE = 2;
+   private static final int RESULT_BUFFER_SIZE = 1;
 
    // Serial number for each request received
    private long nextRequestSequenceNumber_ = 0;
@@ -80,6 +81,11 @@ public final class StatsComputeQueue {
    // Guarded by monitor on this
    private final List<ImagesAndStats> storedStats_ =
          new ArrayList<ImagesAndStats>();
+
+   // Track the latest pending request coordinates by priority to enable skipping
+   // Guarded by monitor on this
+   private final List<Coords> pendingRequestCoords_ =
+         new ArrayList<Coords>();
 
    // Guarded by monitor on this
    private long updateIntervalNs_ = 0;
@@ -122,6 +128,25 @@ public final class StatsComputeQueue {
       long sequenceNumber = nextRequestSequenceNumber_++;
       long nowNs = System.nanoTime();
       int priority = request.getNumberOfImages();
+      Coords requestCoords = request.getNominalCoords();
+
+      // Check if there's already a pending request for this priority
+      // If so, skip this request to avoid falling behind during high-speed acquisition
+      while (pendingRequestCoords_.size() <= priority) {
+         pendingRequestCoords_.add(null);
+      }
+
+      Coords pendingCoords = pendingRequestCoords_.get(priority);
+      if (pendingCoords != null && pendingCoords.equals(requestCoords)) {
+         // Same coordinates already pending, skip this redundant request
+         if (perfMon_ != null) {
+            perfMon_.sampleTimeInterval("Request skipped - same coords pending");
+         }
+         return;
+      }
+
+      // Update the pending coords for this priority
+      pendingRequestCoords_.set(priority, requestCoords);
 
       if (updateIntervalNs_ < Long.MAX_VALUE) {
          final long waitTargetNs = updateIntervalNs_ == Long.MAX_VALUE
@@ -179,6 +204,12 @@ public final class StatsComputeQueue {
                if (perfMon_ != null) {
                   perfMon_.sampleTimeInterval("Compute interrupted (!)");
                }
+               // Clear pending coords even on interruption
+               synchronized (StatsComputeQueue.this) {
+                  if (priority < pendingRequestCoords_.size()) {
+                     pendingRequestCoords_.set(priority, null);
+                  }
+               }
                return;
             }
             if (perfMon_ != null) {
@@ -201,6 +232,11 @@ public final class StatsComputeQueue {
                if (storedStats_.size() > MAX_STORED_STATS) {
                   // Remove oldest entries (lowest indices)
                   storedStats_.subList(0, storedStats_.size() - MAX_STORED_STATS).clear();
+               }
+
+               // Clear pending coords for this priority to allow new requests
+               if (priority < pendingRequestCoords_.size()) {
+                  pendingRequestCoords_.set(priority, null);
                }
             }
          }

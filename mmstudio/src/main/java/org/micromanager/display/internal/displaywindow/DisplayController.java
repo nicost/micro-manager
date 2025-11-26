@@ -141,7 +141,16 @@ public final class DisplayController extends DisplayWindowAPIAdapter
 
    // Track pending display runnables to prevent memory accumulation
    private final AtomicInteger pendingDisplayRunnables_ = new AtomicInteger(0);
-   private static final int MAX_PENDING_DISPLAYS = 5;
+   // Maximum number of pending display runnables to prevent memory accumulation.
+   // Set to 10 to provide buffer during high-speed acquisition while still
+   // preventing unbounded growth. Works with timeout-based reset mechanism.
+   private static final int MAX_PENDING_DISPLAYS = 10;
+
+   // Track when counter has been stuck at maximum to enable recovery.
+   // If counter stays at MAX for more than COUNTER_RESET_TIMEOUT_NS,
+   // we force a reset to allow at least one display update through.
+   private volatile long counterMaxSinceNs_ = 0;
+   private static final long COUNTER_RESET_TIMEOUT_NS = 500_000_000L; // 500ms timeout
 
    private PerformanceMonitor perfMon_
          = PerformanceMonitor.createWithTimeConstantMs(1000.0);
@@ -355,11 +364,33 @@ public final class DisplayController extends DisplayWindowAPIAdapter
       Preconditions.checkArgument(images.getRequest().getNumberOfImages() > 0);
 
       // Check if too many display runnables are pending to prevent memory buildup
-      if (pendingDisplayRunnables_.get() >= MAX_PENDING_DISPLAYS) {
-         if (perfMon_ != null) {
-            perfMon_.sampleTimeInterval("Display scheduling skipped - queue full");
+      int currentPending = pendingDisplayRunnables_.get();
+
+      if (currentPending >= MAX_PENDING_DISPLAYS) {
+         long now = System.nanoTime();
+
+         // If this is the first time we hit max, record the time
+         if (counterMaxSinceNs_ == 0) {
+            counterMaxSinceNs_ = now;
          }
-         return;  // Skip this display update to prevent memory accumulation
+
+         // If counter has been at max for too long, reset it to allow recovery
+         if (now - counterMaxSinceNs_ > COUNTER_RESET_TIMEOUT_NS) {
+            if (perfMon_ != null) {
+               perfMon_.sampleTimeInterval("Display counter forced reset after timeout");
+            }
+            // Force reset to allow at least one display update through
+            pendingDisplayRunnables_.set(MAX_PENDING_DISPLAYS - 1);
+            counterMaxSinceNs_ = 0;
+         } else {
+            if (perfMon_ != null) {
+               perfMon_.sampleTimeInterval("Display scheduling skipped - queue full");
+            }
+            return;  // Skip this display update to prevent memory accumulation
+         }
+      } else {
+         // Reset the timeout tracking when counter is below max
+         counterMaxSinceNs_ = 0;
       }
 
       pendingDisplayRunnables_.incrementAndGet();
@@ -386,7 +417,10 @@ public final class DisplayController extends DisplayWindowAPIAdapter
       // One of the nice things about doing it this way is that we can
       // coalesce the displaying tasks for multiple display windows.
 
-      runnablePool_.invokeAsLateAsPossibleWithCoalescence(new CoalescentRunnable() {
+      // Use invokeLaterWithCoalescence instead of invokeAsLateAsPossibleWithCoalescence
+      // to avoid EDT congestion from skip-count callbacks during high-speed acquisition.
+      // Regular coalescing is sufficient since MIN_REPAINT_PERIOD_NS throttles display rate.
+      runnablePool_.invokeLaterWithCoalescence(new CoalescentRunnable() {
          @Override
          public Class<?> getCoalescenceClass() {
             return getClass();
@@ -556,7 +590,7 @@ public final class DisplayController extends DisplayWindowAPIAdapter
          });
       }
 
-      runnablePool_.invokeAsLateAsPossibleWithCoalescence(new CoalescentRunnable() {
+      runnablePool_.invokeLaterWithCoalescence(new CoalescentRunnable() {
          @Override
          public Class<?> getCoalescenceClass() {
             return getClass();
