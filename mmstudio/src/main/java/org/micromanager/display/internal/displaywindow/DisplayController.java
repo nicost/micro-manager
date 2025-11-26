@@ -104,7 +104,16 @@ public final class DisplayController extends DisplayWindowAPIAdapter
    private final Set<String> playbackAxes_ = new HashSet<>();
 
    private final StatsComputeQueue computeQueue_ = StatsComputeQueue.create();
-   private static final long MIN_REPAINT_PERIOD_NS = Math.round(1e9 / 60.0);
+
+   // Adaptive display throttling - reduce display rate during high-speed acquisition
+   // to minimize resource consumption and prevent circular buffer overflows
+   private static final long BASE_REPAINT_PERIOD_NS = Math.round(1e9 / 60.0); // 60 FPS normal
+   private static final long HIGH_SPEED_REPAINT_PERIOD_NS = Math.round(1e9 / 30.0); // 30 FPS high-speed
+   private static final long VERY_HIGH_SPEED_REPAINT_PERIOD_NS = Math.round(1e9 / 15.0); // 15 FPS very high-speed
+
+   // Thresholds for switching display rates based on estimated camera FPS
+   private static final double HIGH_SPEED_THRESHOLD_FPS = 30.0;
+   private static final double VERY_HIGH_SPEED_THRESHOLD_FPS = 60.0;
 
    private final LinkManager linkManager_;
 
@@ -151,6 +160,12 @@ public final class DisplayController extends DisplayWindowAPIAdapter
    // we force a reset to allow at least one display update through.
    private volatile long counterMaxSinceNs_ = 0;
    private static final long COUNTER_RESET_TIMEOUT_NS = 500_000_000L; // 500ms timeout
+
+   // Track image arrival times to estimate camera FPS for adaptive throttling
+   private static final int IMAGE_TIMING_WINDOW_SIZE = 10;
+   private final long[] imageArrivalTimes_ = new long[IMAGE_TIMING_WINDOW_SIZE];
+   private int imageTimingIndex_ = 0;
+   private volatile double estimatedCameraFps_ = 0.0;
 
    private PerformanceMonitor perfMon_
          = PerformanceMonitor.createWithTimeConstantMs(1000.0);
@@ -356,8 +371,62 @@ public final class DisplayController extends DisplayWindowAPIAdapter
 
       scheduleDisplayInUI(stats);
 
-      // Throttle display scheduling
-      return MIN_REPAINT_PERIOD_NS;
+      // Return adaptive throttle period based on camera speed
+      return getAdaptiveRepaintPeriodNs();
+   }
+
+   /**
+    * Calculate estimated camera frame rate from recent image arrivals.
+    * Used for adaptive display throttling during high-speed acquisition.
+    *
+    * @return Estimated camera FPS, or 0 if insufficient data
+    */
+   private double calculateCameraFps() {
+      // Need at least 3 samples to calculate FPS
+      if (imageTimingIndex_ < 3) {
+         return 0.0;
+      }
+
+      // Calculate time span across the window
+      int count = Math.min(imageTimingIndex_, IMAGE_TIMING_WINDOW_SIZE);
+      long oldest = imageArrivalTimes_[0];
+      long newest = imageArrivalTimes_[(imageTimingIndex_ - 1 + IMAGE_TIMING_WINDOW_SIZE)
+                                        % IMAGE_TIMING_WINDOW_SIZE];
+
+      if (newest <= oldest) {
+         return 0.0; // Invalid timing data
+      }
+
+      long spanNs = newest - oldest;
+      if (spanNs == 0) {
+         return 0.0;
+      }
+
+      // FPS = (count - 1) / time_span_in_seconds
+      double spanSeconds = spanNs / 1e9;
+      return (count - 1) / spanSeconds;
+   }
+
+   /**
+    * Get display throttle period based on current camera acquisition speed.
+    * Automatically reduces display rate during high-speed acquisition to
+    * minimize resource consumption and prevent circular buffer overflows.
+    *
+    * @return Minimum period in nanoseconds between display updates
+    */
+   private long getAdaptiveRepaintPeriodNs() {
+      double cameraFps = estimatedCameraFps_;
+
+      if (cameraFps > VERY_HIGH_SPEED_THRESHOLD_FPS) {
+         // Very high speed (>60 FPS): Display at 15 FPS to minimize overhead
+         return VERY_HIGH_SPEED_REPAINT_PERIOD_NS;
+      } else if (cameraFps > HIGH_SPEED_THRESHOLD_FPS) {
+         // High speed (30-60 FPS): Display at 30 FPS for balance
+         return HIGH_SPEED_REPAINT_PERIOD_NS;
+      } else {
+         // Normal speed (<30 FPS): Display at full 60 FPS
+         return BASE_REPAINT_PERIOD_NS;
+      }
    }
 
    private void scheduleDisplayInUI(final ImagesAndStats images) {
@@ -982,9 +1051,18 @@ public final class DisplayController extends DisplayWindowAPIAdapter
     */
    @Subscribe
    public void onNewImage(final DataProviderHasNewImageEvent event) {
+      // Track image arrival time for adaptive display throttling
+      long now = System.nanoTime();
+      imageArrivalTimes_[imageTimingIndex_] = now;
+      imageTimingIndex_ = (imageTimingIndex_ + 1) % IMAGE_TIMING_WINDOW_SIZE;
+      estimatedCameraFps_ = calculateCameraFps();
+
       if (perfMon_ != null) {
          perfMon_.sampleTimeInterval("NewImageEvent");
+         perfMon_.sample("Estimated camera FPS", estimatedCameraFps_);
+         perfMon_.sample("Display throttle period (ms)", getAdaptiveRepaintPeriodNs() / 1000000.0);
       }
+
       synchronized (closeGuard_) {
          if (closeCompleted_) {
             return;
