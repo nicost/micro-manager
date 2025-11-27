@@ -87,6 +87,11 @@ public final class StatsComputeQueue {
    private final List<Coords> pendingRequestCoords_ =
          new ArrayList<Coords>();
 
+   // Track when each pending request started to detect stuck requests
+   // Guarded by monitor on this
+   private final List<Long> pendingRequestStartTime_ =
+         new ArrayList<Long>();
+
    // Guarded by monitor on this
    private long updateIntervalNs_ = 0;
 
@@ -138,15 +143,35 @@ public final class StatsComputeQueue {
 
       Coords pendingCoords = pendingRequestCoords_.get(priority);
       if (pendingCoords != null && pendingCoords.equals(requestCoords)) {
-         // Same coordinates already pending, skip this redundant request
-         if (perfMon_ != null) {
-            perfMon_.sampleTimeInterval("Request skipped - same coords pending");
+         // Same coordinates already pending - but if it's been pending too long,
+         // allow a new request to go through (previous one may be stuck)
+         while (pendingRequestStartTime_.size() <= priority) {
+            pendingRequestStartTime_.add(null);
          }
-         return;
+         Long pendingStartTime = pendingRequestStartTime_.get(priority);
+         if (pendingStartTime != null) {
+            long timeSincePendingMs = (nowNs - pendingStartTime) / 1_000_000L;
+            if (timeSincePendingMs < 100) {  // 100ms threshold
+               // Recent pending request, skip this one
+               if (perfMon_ != null) {
+                  perfMon_.sampleTimeInterval("Request skipped - same coords pending");
+               }
+               return;
+            } else {
+               // Old pending request, allow this one through
+               if (perfMon_ != null) {
+                  perfMon_.sampleTimeInterval("Request allowed - old pending cleared");
+               }
+            }
+         }
       }
 
       // Update the pending coords for this priority
       pendingRequestCoords_.set(priority, requestCoords);
+      while (pendingRequestStartTime_.size() <= priority) {
+         pendingRequestStartTime_.add(null);
+      }
+      pendingRequestStartTime_.set(priority, nowNs);
 
       if (updateIntervalNs_ < Long.MAX_VALUE) {
          final long waitTargetNs = updateIntervalNs_ == Long.MAX_VALUE
@@ -209,6 +234,9 @@ public final class StatsComputeQueue {
                   if (priority < pendingRequestCoords_.size()) {
                      pendingRequestCoords_.set(priority, null);
                   }
+                  if (priority < pendingRequestStartTime_.size()) {
+                     pendingRequestStartTime_.set(priority, null);
+                  }
                }
                return;
             }
@@ -237,6 +265,9 @@ public final class StatsComputeQueue {
                // Clear pending coords for this priority to allow new requests
                if (priority < pendingRequestCoords_.size()) {
                   pendingRequestCoords_.set(priority, null);
+               }
+               if (priority < pendingRequestStartTime_.size()) {
+                  pendingRequestStartTime_.set(priority, null);
                }
             }
          }
