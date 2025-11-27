@@ -151,7 +151,7 @@ public final class StatsComputeQueue {
          Long pendingStartTime = pendingRequestStartTime_.get(priority);
          if (pendingStartTime != null) {
             long timeSincePendingMs = (nowNs - pendingStartTime) / 1_000_000L;
-            if (timeSincePendingMs < 100) {  // 100ms threshold
+            if (timeSincePendingMs < 33) {  // 33ms threshold for 30 FPS live updates
                // Recent pending request, skip this one
                if (perfMon_ != null) {
                   perfMon_.sampleTimeInterval("Request skipped - same coords pending");
