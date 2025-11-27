@@ -110,7 +110,13 @@ public class CoalescentEDTRunnablePool {
          synchronized (CoalescentEDTRunnablePool.this) {
             Long skipCount = skipCounts_.get(coalescenceClass);
             if (skipCount != null && skipCount > 0) {
-               skipCounts_.put(coalescenceClass, skipCount - 1);
+               long newCount = skipCount - 1;
+               if (newCount == 0) {
+                  // Remove entry when count reaches 0 to prevent unbounded HashMap growth
+                  skipCounts_.remove(coalescenceClass);
+               } else {
+                  skipCounts_.put(coalescenceClass, newCount);
+               }
                return;
             }
             coalesced = coalescedRunnables_.remove(coalescenceClass);

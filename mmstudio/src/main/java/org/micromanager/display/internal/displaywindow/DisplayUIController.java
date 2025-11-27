@@ -1340,7 +1340,7 @@ public final class DisplayUIController implements Closeable, WindowListener,
    public void updateTitle() {
       if (frame_ != null) {
 
-         runnablePool_.invokeAsLateAsPossibleWithCoalescence(new CoalescentRunnable() {
+         runnablePool_.invokeLaterWithCoalescence(new CoalescentRunnable() {
             @Override
             public Class<?> getCoalescenceClass() {
                return getClass();
@@ -1495,7 +1495,7 @@ public final class DisplayUIController implements Closeable, WindowListener,
    public void selectionMayHaveChanged(final BoundsRectAndMask selection) {
       if (selection != lastSeenSelection_) {
          if (selection == null || !selection.equals(lastSeenSelection_)) {
-            runnablePool_.invokeAsLateAsPossibleWithCoalescence(new CoalescentRunnable() {
+            runnablePool_.invokeLaterWithCoalescence(new CoalescentRunnable() {
                @Override
                public Class<?> getCoalescenceClass() {
                   return getClass();
