@@ -186,12 +186,18 @@ public final class DisplayController extends DisplayWindowAPIAdapter
 
    @Override
    public void removeListener(DataViewerListener listener) {
+      // Collect keys to remove (can't remove during iteration)
+      List<Integer> keysToRemove = new ArrayList<>();
+
       for (Map.Entry<Integer, DataViewerListener> entry : listeners_.entrySet()) {
          if (listener.equals(entry.getValue())) {
-            // if we remove the entry, we risk concurrent modification
-            // of the TreeMap.  Therefore, simply set the value to null
-            listeners_.put(entry.getKey(), null);
+            keysToRemove.add(entry.getKey());
          }
+      }
+
+      // Remove collected keys
+      for (Integer key : keysToRemove) {
+         listeners_.remove(key);
       }
    }
 
@@ -445,8 +451,13 @@ public final class DisplayController extends DisplayWindowAPIAdapter
 
          // If counter has been at max for too long, reset it to allow recovery
          if (now - counterMaxSinceNs_ > COUNTER_RESET_TIMEOUT_NS) {
+            // Diagnostic logging for stuck counter
+            ReportingUtils.logMessage("WARNING: Display counter stuck at " + currentPending
+                  + " for 500ms - forcing reset. This may indicate EDT issues.");
+
             if (perfMon_ != null) {
                perfMon_.sampleTimeInterval("Display counter forced reset after timeout");
+               perfMon_.sample("Pending count at timeout", currentPending);
             }
             // Force reset to allow at least one display update through
             pendingDisplayRunnables_.set(MAX_PENDING_DISPLAYS - 1);
@@ -570,6 +581,13 @@ public final class DisplayController extends DisplayWindowAPIAdapter
 
                if (perfMon_ != null) {
                   perfMon_.sampleTimeInterval("Scheduled repaint on EDT");
+               }
+            } catch (Exception e) {
+               // Log exception but don't rethrow - let EDT continue
+               ReportingUtils.logError(e, "Exception in display runnable - EDT protected");
+
+               if (perfMon_ != null) {
+                  perfMon_.sampleTimeInterval("Display runnable exception caught");
                }
             } finally {
                // Decrement counter to allow new display updates

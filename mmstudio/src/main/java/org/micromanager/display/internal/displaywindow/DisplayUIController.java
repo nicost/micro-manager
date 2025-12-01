@@ -200,6 +200,9 @@ public final class DisplayUIController implements Closeable, WindowListener,
    private final List<String> displayedAxes_ = new ArrayList<>();
    private final List<Integer> displayedAxisLengths_ = new ArrayList<>();
    private ImagesAndStats displayedImages_;
+   private List<Coords> cachedDisplayedCoords_ = null; // Cache for getAllDisplayedCoords()
+   private List<String> lastScrollableAxes_ = null; // Cache for early exit in expandDisplayedRangeToInclude
+   private Map<String, Integer> lastScrollableLengths_ = null; // Cache for early exit in expandDisplayedRangeToInclude
    private Double cachedPixelSize_ = -1.0;
    private boolean isPreview_ = false;
    private static ChannelColorEvent channelColorEvent_;
@@ -772,6 +775,9 @@ public final class DisplayUIController implements Closeable, WindowListener,
          noImagesMessageLabel_.setText("Preparing to Display...");
       }
 
+      // Track if any axis actually changed
+      boolean axesChanged = false;
+
       for (Coords c : coords) {
          for (String axis : c.getAxes()) {
             if (axis != null) {
@@ -780,15 +786,27 @@ public final class DisplayUIController implements Closeable, WindowListener,
                if (axisIndex == -1) {
                   displayedAxes_.add(axis);
                   displayedAxisLengths_.add(index + 1);
+                  axesChanged = true;
                } else {
                   int oldLength = displayedAxisLengths_.get(axisIndex);
                   int newLength = Math.max(oldLength, index + 1);
-                  displayedAxisLengths_.set(axisIndex, newLength);
+                  if (newLength != oldLength) {
+                     displayedAxisLengths_.set(axisIndex, newLength);
+                     axesChanged = true;
+                  }
                }
             } else {
                studio_.logs().logError("Null axis in Coords: " + c);
             }
          }
+      }
+
+      // Early exit if nothing changed - KEY OPTIMIZATION
+      if (!axesChanged && lastScrollableAxes_ != null) {
+         if (perfMon_ != null) {
+            perfMon_.sampleTimeInterval("expandDisplayedRange early exit - no change");
+         }
+         return; // Skip expensive sorting and UI updates
       }
 
       List<String> scrollableAxes = new ArrayList<>();
@@ -828,6 +846,10 @@ public final class DisplayUIController implements Closeable, WindowListener,
       if (ijBridge_ != null) {
          ijBridge_.mm2ijEnsureDisplayAxisExtents();
       }
+
+      // Cache the result for early exit on next call
+      lastScrollableAxes_ = new ArrayList<>(scrollableAxes);
+      lastScrollableLengths_ = new HashMap<>(scrollableLengths);
    }
 
    private ScheduledFuture<?> scheduleSkippedImages(ImagesAndStats images) {
@@ -850,57 +872,119 @@ public final class DisplayUIController implements Closeable, WindowListener,
 
       repaintScheduledForNewImages_.set(true);
 
-      boolean firstTime = false;
-      if (ijBridge_ == null) {
-         firstTime = true;
-         setupDisplayUI(images);  // creates ijBridge amongst other things
+      try {
+         boolean firstTime = false;
+         if (ijBridge_ == null) {
+            firstTime = true;
+            try {
+               setupDisplayUI(images);  // creates ijBridge amongst other things
+            } catch (Exception e) {
+               ReportingUtils.logError(e, "Exception in setupDisplayUI");
+               throw e;  // Re-throw to exit displayImages
+            }
+         }
+
+         // Clear old reference to allow GC to reclaim memory from previous images
+         displayedImages_ = null;
+         cachedDisplayedCoords_ = null; // Invalidate cached coords
+         displayedImages_ = images;
+         Coords nominalCoords = images.getRequest().getNominalCoords();
+
+         // A display request may come in ahead of an expand-range request, so
+         // make sure to update our range first
+         try {
+            // getAllDisplayedCoords() already includes nominalCoords,
+            // so we only need one call to expand the range (optimization)
+            List<Coords> allCoords = getAllDisplayedCoords();
+            if (!allCoords.isEmpty()) {
+               expandDisplayedRangeToInclude(allCoords);
+            }
+         } catch (Exception e) {
+            ReportingUtils.logError(e, "Exception expanding display range");
+            // Don't re-throw - continue with other operations
+         }
+
+         try {
+            updateSliders(images);
+         } catch (Exception e) {
+            ReportingUtils.logError(e, "Exception updating sliders");
+            // Don't re-throw - continue with other operations
+         }
+
+         if (firstTime) {
+            // We need to set the displaySettings after the ijBridge was created
+            // (in the setupDisplayUI function), and after the display range
+            // has been expanded to include all Coords in the "images"
+            // If we do not do so, only one channel will be shown
+            // If we call applyDisplaySettings every time, the Display fps
+            // will never be shown
+            try {
+               applyDisplaySettings(displayController_.getDisplaySettings());
+            } catch (Exception e) {
+               ReportingUtils.logError(e, "Exception applying display settings");
+               // Don't re-throw - continue with other operations
+            }
+         }
+
+         // info label: The only aspect that can change is pixel size.  To avoid
+         // redrawing the info line (which may be expensive), check if pixelsize
+         // changed (which can happen for the snap/live window) and only redraw the
+         // info label if it changed.
+         try {
+            Double currentPixelSize = images.getRequest().getImage(0).getMetadata().getPixelSizeUm();
+            if (currentPixelSize == null) {
+               currentPixelSize = 0.0;
+            }
+            if (!currentPixelSize.equals(cachedPixelSize_)) {
+               infoLabel_.setText(this.getInfoString(images));
+               ijBridge_.mm2ijSetMetadata();
+               cachedPixelSize_ = images.getRequest().getImage(0).getMetadata()
+                     .getPixelSizeUm();
+            }
+         } catch (Exception e) {
+            ReportingUtils.logError(e, "Exception updating info label");
+            // Don't re-throw - continue with other operations
+         }
+
+         try {
+            ijBridge_.mm2ijSetDisplayPosition(nominalCoords);
+         } catch (Exception e) {
+            ReportingUtils.logError(e, "Exception setting display position");
+            // Don't re-throw - continue with other operations
+         }
+
+         try {
+            applyAutostretch(images, displayController_.getDisplaySettings());
+         } catch (Exception e) {
+            ReportingUtils.logError(e, "Exception applying autostretch");
+            // Don't re-throw - continue with other operations
+         }
+
+         if (mouseLocationOnImage_ != null) {
+            try {
+               updatePixelInformation(); // TODO Can skip if identical images
+            } catch (Exception e) {
+               ReportingUtils.logError(e, "Exception updating pixel information");
+               // Don't re-throw - continue with other operations
+            }
+         }
+
+         try {
+            imageInfoLabel_.setText(getImageInfoLabel(images));
+         } catch (Exception e) {
+            ReportingUtils.logError(e, "Exception updating image info label");
+            // Don't re-throw - continue with other operations
+         }
+
+      } finally {
+         // CRITICAL: Always reset flag to prevent permanent freeze
+         // This runs even if exception occurs or return is called
+         repaintScheduledForNewImages_.set(false);
+
+         if (perfMon_ != null) {
+            perfMon_.sampleTimeInterval("displayImages completed");
+         }
       }
-
-      // Clear old reference to allow GC to reclaim memory from previous images
-      displayedImages_ = null;
-      displayedImages_ = images;
-      Coords nominalCoords = images.getRequest().getNominalCoords();
-
-      // A display request may come in ahead of an expand-range request, so
-      // make sure to update our range first
-      expandDisplayedRangeToInclude(nominalCoords);
-      expandDisplayedRangeToInclude(getAllDisplayedCoords());
-
-      updateSliders(images);
-
-      if (firstTime) {
-         // We need to set the displaySettings after the ijBridge was created
-         // (in the setupDisplayUI function), and after the display range
-         // has been expanded to include all Coords in the "images"
-         // If we do not do so, only one channel will be shown
-         // If we call applyDisplaySettings every time, the Display fps 
-         // will never be shown
-         applyDisplaySettings(displayController_.getDisplaySettings());
-      }
-
-      // info label: The only aspect that can change is pixel size.  To avoid
-      // redrawing the info line (which may be expensive), check if pixelsize
-      // changed (which can happen for the snap/live window) and only redraw the 
-      // info label if it changed.
-      Double currentPixelSize = images.getRequest().getImage(0).getMetadata().getPixelSizeUm();
-      if (currentPixelSize == null) {
-         currentPixelSize = 0.0;
-      }
-      if (!currentPixelSize.equals(cachedPixelSize_)) {
-         infoLabel_.setText(this.getInfoString(images));
-         ijBridge_.mm2ijSetMetadata();
-         cachedPixelSize_ = images.getRequest().getImage(0).getMetadata()
-               .getPixelSizeUm();
-      }
-
-      ijBridge_.mm2ijSetDisplayPosition(nominalCoords);
-      applyAutostretch(images, displayController_.getDisplaySettings());
-
-      if (mouseLocationOnImage_ != null) {
-         updatePixelInformation(); // TODO Can skip if identical images
-      }
-
-      imageInfoLabel_.setText(getImageInfoLabel(images));
 
    }
 
@@ -1888,10 +1972,20 @@ public final class DisplayUIController implements Closeable, WindowListener,
          return Collections.emptyList();
       }
 
+      // Return cached result if available
+      if (cachedDisplayedCoords_ != null) {
+         return cachedDisplayedCoords_;
+      }
+
       List<Coords> ret = new ArrayList<>();
       for (Image image : displayedImages_.getRequest().getImages()) {
-         ret.add(image.getCoords());
+         // not sure why, but I see  a null pointer originating from line 1895
+         // the only thing that can be null here is image
+         if (image != null) {
+            ret.add(image.getCoords());
+         }
       }
+      cachedDisplayedCoords_ = ret;
       return ret;
    }
 
