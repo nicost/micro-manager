@@ -32,7 +32,9 @@ import java.util.TreeMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.RunnableFuture;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import javax.swing.SwingUtilities;
 import org.micromanager.Studio;
 import org.micromanager.data.Coordinates;
@@ -158,7 +160,8 @@ public final class DisplayController extends DisplayWindowAPIAdapter
    // Track when counter has been stuck at maximum to enable recovery.
    // If counter stays at MAX for more than COUNTER_RESET_TIMEOUT_NS,
    // we force a reset to allow at least one display update through.
-   private volatile long counterMaxSinceNs_ = 0;
+   // Using AtomicLong for thread-safe compareAndSet operations.
+   private final AtomicLong counterMaxSinceNs_ = new AtomicLong(0);
    private static final long COUNTER_RESET_TIMEOUT_NS = 500_000_000L; // 500ms timeout
 
    // Track image arrival times to estimate camera FPS for adaptive throttling
@@ -447,24 +450,29 @@ public final class DisplayController extends DisplayWindowAPIAdapter
       if (currentPending >= MAX_PENDING_DISPLAYS) {
          long now = System.nanoTime();
 
-         // If this is the first time we hit max, record the time
-         if (counterMaxSinceNs_ == 0) {
-            counterMaxSinceNs_ = now;
-         }
+         // Thread-safe: Try to set timeout start time if not already set
+         // compareAndSet ensures only one thread sets the initial timeout value
+         long expectedZero = 0;
+         counterMaxSinceNs_.compareAndSet(expectedZero, now);
+
+         // Read the actual start time (either our value or another thread's)
+         long stuckSince = counterMaxSinceNs_.get();
 
          // If counter has been at max for too long, reset it to allow recovery
-         if (now - counterMaxSinceNs_ > COUNTER_RESET_TIMEOUT_NS) {
+         if (now - stuckSince > COUNTER_RESET_TIMEOUT_NS) {
             // Diagnostic logging for stuck counter
             ReportingUtils.logMessage("WARNING: Display counter stuck at " + currentPending
-                  + " for 500ms - forcing reset. This may indicate EDT issues.");
+                  + " for " + TimeUnit.NANOSECONDS.toMillis(now - stuckSince)
+                  + "ms - forcing reset. This may indicate EDT issues.");
 
             if (perfMon_ != null) {
                perfMon_.sampleTimeInterval("Display counter forced reset after timeout");
                perfMon_.sample("Pending count at timeout", currentPending);
+               perfMon_.sample("Display counter forced reset after timeout", 1);
             }
             // Force reset to allow at least one display update through
             pendingDisplayRunnables_.set(MAX_PENDING_DISPLAYS - 1);
-            counterMaxSinceNs_ = 0;
+            counterMaxSinceNs_.set(0);  // Reset for next potential stuck state
          } else {
             if (perfMon_ != null) {
                perfMon_.sampleTimeInterval("Display scheduling skipped - queue full");
@@ -473,7 +481,7 @@ public final class DisplayController extends DisplayWindowAPIAdapter
          }
       } else {
          // Reset the timeout tracking when counter is below max
-         counterMaxSinceNs_ = 0;
+         counterMaxSinceNs_.set(0);
       }
 
       pendingDisplayRunnables_.incrementAndGet();
@@ -523,6 +531,12 @@ public final class DisplayController extends DisplayWindowAPIAdapter
             try {
                if (uiController_ == null) { // Closed
                   return;
+               }
+
+               // Diagnostic logging for EDT congestion monitoring
+               if (perfMon_ != null) {
+                  perfMon_.sampleTimeInterval("Display runnable started on EDT");
+                  perfMon_.sample("Pending display count at start", pendingDisplayRunnables_.get());
                }
 
                Image primaryImage = images.getRequest().getImage(0);
@@ -594,7 +608,13 @@ public final class DisplayController extends DisplayWindowAPIAdapter
                }
             } finally {
                // Decrement counter to allow new display updates
-               pendingDisplayRunnables_.decrementAndGet();
+               int newCount = pendingDisplayRunnables_.decrementAndGet();
+
+               // Safety check: if counter was stuck at max but we're completing,
+               // ensure timeout marker is reset to prevent permanent stuck state
+               if (newCount == MAX_PENDING_DISPLAYS - 1) {
+                  counterMaxSinceNs_.set(0);
+               }
             }
          }
       });
