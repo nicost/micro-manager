@@ -463,7 +463,8 @@ public final class StorageMultipageTiff implements Storage {
    }
 
    public Set<Coords> imageKeys() {
-      return coordsToReader_.keySet();
+      // Return a copy to avoid ConcurrentModificationException when caller iterates
+      return new HashSet<>(coordsToReader_.keySet());
    }
 
    /**
@@ -854,7 +855,9 @@ public final class StorageMultipageTiff implements Storage {
       if (maxIndices_ == null) {
          // Calculate max indices by examining all registered Readers.
          HashMap<String, Integer> maxIndices = new HashMap<>();
-         for (Coords coords : coordsToReader_.keySet()) {
+         // Copy keySet to avoid ConcurrentModificationException
+         Set<Coords> coordsSnapshot = new HashSet<>(coordsToReader_.keySet());
+         for (Coords coords : coordsSnapshot) {
             for (String axis : coords.getAxes()) {
                if (!maxIndices.containsKey(axis)
                      || coords.getIndex(axis) > maxIndices.get(axis)) {
@@ -886,7 +889,9 @@ public final class StorageMultipageTiff implements Storage {
       }
 
       int maxIndex = 0;
-      for (Coords coords : coordsToReader_.keySet()) {
+      // Copy keySet to avoid ConcurrentModificationException
+      Set<Coords> coordsSnapshot = new HashSet<>(coordsToReader_.keySet());
+      for (Coords coords : coordsSnapshot) {
          if (coords.getIndex(axis) > maxIndex) {
             maxIndex = coords.getIndex(axis);
          }
@@ -972,21 +977,20 @@ public final class StorageMultipageTiff implements Storage {
             }
          } else {
             // Brute force it.  This will be slow with large data sets
-            // Note that coordsToReader_ can be modified at the same time,
-            // catch ConcurrentModificationException rather than incur the cost
-            // of a lock that could slow down insertions
-            try {
-               for (Coords imageCoords : coordsToReader_.keySet()) {
-                  if (coords.equals(imageCoords.copyRemovingAxes(ignoreTheseAxes))) {
-                     try {
-                        result.add(coordsToReader_.get(imageCoords).readImage(imageCoords));
-                     } catch (IOException ex) {
-                        ReportingUtils.logError("Failed to read image at " + imageCoords);
+            // Make a copy of the keySet to avoid ConcurrentModificationException
+            // when coordsToReader_ is modified during iteration
+            Set<Coords> coordsSnapshot = new HashSet<>(coordsToReader_.keySet());
+            for (Coords imageCoords : coordsSnapshot) {
+               if (coords.equals(imageCoords.copyRemovingAxes(ignoreTheseAxes))) {
+                  try {
+                     MultipageTiffReader reader = coordsToReader_.get(imageCoords);
+                     if (reader != null) {
+                        result.add(reader.readImage(imageCoords));
                      }
+                  } catch (IOException ex) {
+                     ReportingUtils.logError("Failed to read image at " + imageCoords);
                   }
                }
-            } catch (ConcurrentModificationException cme) {
-               ReportingUtils.logError(cme, "coordsToReader_ was modified while iterating");
             }
          }
       }
@@ -1026,7 +1030,8 @@ public final class StorageMultipageTiff implements Storage {
 
    @Override
    public Iterable<Coords> getUnorderedImageCoords() {
-      return coordsToReader_.keySet();
+      // Return a copy to avoid ConcurrentModificationException when caller iterates
+      return new HashSet<>(coordsToReader_.keySet());
    }
 
    @Override
@@ -1048,7 +1053,9 @@ public final class StorageMultipageTiff implements Storage {
       }
       // For files we read from disk.
       int errorCounter = 0;
-      for (MultipageTiffReader reader : coordsToReader_.values()) {
+      // Copy values to avoid ConcurrentModificationException during cleanup
+      Collection<MultipageTiffReader> readers = new ArrayList<>(coordsToReader_.values());
+      for (MultipageTiffReader reader : readers) {
          try {
             reader.close();
          } catch (IOException e) {
