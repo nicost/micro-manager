@@ -276,6 +276,9 @@ public final class DisplayUIController implements Closeable, WindowListener,
       skippedImageDisplayExecutor_ =
                new ScheduledThreadPoolExecutor(1);
       skippedImageDisplayExecutor_.setRemoveOnCancelPolicy(true);
+      // Limit queue to prevent memory accumulation during high-speed display
+      skippedImageDisplayExecutor_.setMaximumPoolSize(1);
+      skippedImageDisplayExecutor_.setCorePoolSize(1);
    }
 
    public void setPerformanceMonitor(PerformanceMonitor perfMon) {
@@ -863,7 +866,12 @@ public final class DisplayUIController implements Closeable, WindowListener,
    @MustCallOnEDT
    void displayImages(ImagesAndStats images) {
       if (scheduledDisplayFuture_ != null && !scheduledDisplayFuture_.isDone()) {
-         scheduledDisplayFuture_.cancel(false);
+         // Use cancel(true) to ensure task is interrupted and removed from queue
+         scheduledDisplayFuture_.cancel(true);
+      }
+      // Purge cancelled tasks to prevent queue accumulation
+      if (skippedImageDisplayExecutor_.getQueue().size() > 5) {
+         skippedImageDisplayExecutor_.purge();
       }
       if (repaintScheduledForNewImages_.get()) {
          scheduledDisplayFuture_ = scheduleSkippedImages(images);
