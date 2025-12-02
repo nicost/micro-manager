@@ -980,19 +980,26 @@ public final class StorageMultipageTiff implements Storage {
             }
          } else {
             // Brute force it.  This will be slow with large data sets
-            // Make a copy of the keySet to avoid ConcurrentModificationException
-            // when coordsToReader_ is modified during iteration
-            Set<Coords> coordsSnapshot = new HashSet<>(coordsToReader_.keySet());
-            for (Coords imageCoords : coordsSnapshot) {
-               if (coords.equals(imageCoords.copyRemovingAxes(ignoreTheseAxes))) {
-                  try {
-                     MultipageTiffReader reader = coordsToReader_.get(imageCoords);
-                     if (reader != null) {
-                        result.add(reader.readImage(imageCoords));
-                     }
-                  } catch (IOException ex) {
-                     ReportingUtils.logError("Failed to read image at " + imageCoords);
+            // Collect matching readers while holding lock, then read outside lock
+            // to avoid copying 15k+ coords into a HashSet on every call
+            List<Map.Entry<Coords, MultipageTiffReader>> readersToProcess = new ArrayList<>();
+            synchronized (coordsToReader_) {
+               for (Map.Entry<Coords, MultipageTiffReader> entry : coordsToReader_.entrySet()) {
+                  Coords imageCoords = entry.getKey();
+                  if (coords.equals(imageCoords.copyRemovingAxes(ignoreTheseAxes))) {
+                     readersToProcess.add(entry);
                   }
+               }
+            }
+            // Read images outside the lock to avoid blocking during I/O
+            for (Map.Entry<Coords, MultipageTiffReader> entry : readersToProcess) {
+               try {
+                  MultipageTiffReader reader = entry.getValue();
+                  if (reader != null) {
+                     result.add(reader.readImage(entry.getKey()));
+                  }
+               } catch (IOException ex) {
+                  ReportingUtils.logError("Failed to read image at " + entry.getKey());
                }
             }
          }
