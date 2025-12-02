@@ -397,13 +397,15 @@ public final class StorageMultipageTiff implements Storage {
          coordsToPendingImage_.put(coords, image);
       }
 
-      startWritingTask(image);
-
-      writingExecutor_.submit(() -> {
+      try {
+         startWritingTask(image);
+      } finally {
+         // Remove from pending immediately after write task completes
+         // to prevent memory accumulation (critical fix for OOM at ~49k images)
          synchronized (coordsToPendingImage_) {
             coordsToPendingImage_.remove(coords);
          }
-      });
+      }
    }
 
    /**
