@@ -189,7 +189,10 @@ public final class DisplayController extends DisplayWindowAPIAdapter
       // Collect keys to remove (can't remove during iteration)
       List<Integer> keysToRemove = new ArrayList<>();
 
-      for (Map.Entry<Integer, DataViewerListener> entry : listeners_.entrySet()) {
+      // Copy entrySet to avoid ConcurrentModificationException
+      Set<Map.Entry<Integer, DataViewerListener>> entriesCopy =
+            new HashSet<>(listeners_.entrySet());
+      for (Map.Entry<Integer, DataViewerListener> entry : entriesCopy) {
          if (listener.equals(entry.getValue())) {
             keysToRemove.add(entry.getKey());
          }
@@ -1257,7 +1260,9 @@ public final class DisplayController extends DisplayWindowAPIAdapter
          }
       }
 
-      for (DataViewerListener listener : listeners_.values()) {
+      // Copy values to avoid ConcurrentModificationException during window close
+      Collection<DataViewerListener> listenersCopy = new ArrayList<>(listeners_.values());
+      for (DataViewerListener listener : listenersCopy) {
          if (listener != null && !listener.canCloseViewer(this)) {
             return false;
          }
