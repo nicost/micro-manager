@@ -225,6 +225,7 @@ public final class DisplayUIController implements Closeable, WindowListener,
    private static final int DISPLAY_INTERVAL_SMOOTH_N_SAMPLES = 50;
    private final AtomicBoolean repaintScheduledForNewImages_ =
          new AtomicBoolean(false);
+   private volatile long repaintFlagSetTimeNs_ = 0;  // Track when flag was set for timeout recovery
    private final AtomicReference<TimeIntervalRunningQuantile>
          displayIntervalEstimator_ =
          new AtomicReference<>(TimeIntervalRunningQuantile.create(
@@ -881,15 +882,29 @@ public final class DisplayUIController implements Closeable, WindowListener,
          scheduledDisplayFuture_.cancel(true);
       }
       // Purge cancelled tasks to prevent queue accumulation
-      if (skippedImageDisplayExecutor_.getQueue().size() > 5) {
+      // Use aggressive threshold (2 instead of 5) to reduce EDT saturation
+      if (skippedImageDisplayExecutor_.getQueue().size() > 2) {
          skippedImageDisplayExecutor_.purge();
       }
       if (repaintScheduledForNewImages_.get()) {
-         scheduledDisplayFuture_ = scheduleSkippedImages(images);
-         return;
+         long now = System.nanoTime();
+
+         // Check if flag has been stuck for too long (> 2 seconds)
+         // This can happen if EDT is saturated and paint never completes
+         if (repaintFlagSetTimeNs_ > 0 &&
+             now - repaintFlagSetTimeNs_ > 2_000_000_000L) {
+            // Force reset stuck flag to allow display updates to resume
+            ReportingUtils.logMessage("WARNING: repaintScheduledForNewImages flag stuck for 2s - forcing reset");
+            repaintScheduledForNewImages_.set(false);
+            repaintFlagSetTimeNs_ = 0;
+         } else {
+            scheduledDisplayFuture_ = scheduleSkippedImages(images);
+            return;
+         }
       }
 
       repaintScheduledForNewImages_.set(true);
+      repaintFlagSetTimeNs_ = System.nanoTime();
 
       try {
          boolean firstTime = false;
@@ -1776,6 +1791,7 @@ public final class DisplayUIController implements Closeable, WindowListener,
       boolean countAsNewDisplayedImage =
             repaintScheduledForNewImages_.compareAndSet(true, false);
       if (countAsNewDisplayedImage) {
+         repaintFlagSetTimeNs_ = 0;  // Reset timeout tracking when flag is cleared
          if (perfMon_ != null) {
             perfMon_.sampleTimeInterval("Repaint counted as new display");
          }

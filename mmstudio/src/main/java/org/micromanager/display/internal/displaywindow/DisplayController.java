@@ -1126,6 +1126,7 @@ public final class DisplayController extends DisplayWindowAPIAdapter
    private class ExpandDisplayRangeCoalescentRunnable
          implements CoalescentRunnable {
       private final List<Coords> coords_ = new ArrayList<>();
+      private static final int MAX_COALESCED_COORDS = 100;  // Limit accumulation to prevent EDT blocking
 
       ExpandDisplayRangeCoalescentRunnable(Coords coords) {
          coords_.add(coords);
@@ -1138,9 +1139,21 @@ public final class DisplayController extends DisplayWindowAPIAdapter
 
       @Override
       public CoalescentRunnable coalesceWith(CoalescentRunnable another) {
-         coords_.addAll(
-               ((ExpandDisplayRangeCoalescentRunnable) another).coords_);
-         return this;
+         List<Coords> otherCoords =
+               ((ExpandDisplayRangeCoalescentRunnable) another).coords_;
+
+         // Only add coords if we haven't exceeded the limit
+         // This prevents a single runnable from accumulating thousands of coords
+         // which would block EDT for 500ms+ when executed
+         if (coords_.size() + otherCoords.size() <= MAX_COALESCED_COORDS) {
+            coords_.addAll(otherCoords);
+            return this;
+         } else {
+            // Too many coords - don't coalesce, let the other runnable execute separately
+            ReportingUtils.logMessage("ExpandDisplayRangeCoalescentRunnable exceeded max coords ("
+                  + coords_.size() + " + " + otherCoords.size() + "), not coalescing");
+            return another;  // Return the OTHER runnable to execute it separately
+         }
       }
 
       @Override
