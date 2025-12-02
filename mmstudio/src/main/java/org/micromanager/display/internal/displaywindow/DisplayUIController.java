@@ -814,6 +814,10 @@ public final class DisplayUIController implements Closeable, WindowListener,
          if (perfMon_ != null) {
             perfMon_.sampleTimeInterval("expandDisplayedRange early exit - no change");
          }
+         // Even on early exit, ensure ImageJ bridge is synchronized
+         if (ijBridge_ != null) {
+            ijBridge_.mm2ijEnsureDisplayAxisExtents();
+         }
          return; // Skip expensive sorting and UI updates
       }
 
