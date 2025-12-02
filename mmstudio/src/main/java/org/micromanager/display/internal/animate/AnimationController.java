@@ -148,11 +148,38 @@ public final class AnimationController<P> {
     * Permanently cease all animation and scheduled events.
     */
    public void shutdown() {
-      scheduler_.shutdown();
       stopAnimation();
+
+      // Cancel all pending scheduled tasks
+      synchronized (this) {
+         if (scheduledTickFuture_ != null) {
+            scheduledTickFuture_.cancel(true);
+            scheduledTickFuture_ = null;
+         }
+         if (newDataPositionExpiredFuture_ != null) {
+            newDataPositionExpiredFuture_.cancel(true);
+            newDataPositionExpiredFuture_ = null;
+         }
+         if (snapBackFuture_ != null) {
+            snapBackFuture_.cancel(true);
+            snapBackFuture_ = null;
+         }
+      }
+
+      scheduler_.shutdown();
       try {
-         scheduler_.awaitTermination(1, TimeUnit.HOURS);
+         // Wait up to 5 seconds for graceful shutdown
+         if (!scheduler_.awaitTermination(5, TimeUnit.SECONDS)) {
+            // Force shutdown if graceful shutdown times out
+            ReportingUtils.logMessage("AnimationController scheduler did not terminate gracefully, forcing shutdown");
+            scheduler_.shutdownNow();
+            // Wait a bit more for forced shutdown
+            if (!scheduler_.awaitTermination(2, TimeUnit.SECONDS)) {
+               ReportingUtils.logError("AnimationController scheduler did not terminate after forced shutdown");
+            }
+         }
       } catch (InterruptedException notUsedByUs) {
+         scheduler_.shutdownNow();
          Thread.currentThread().interrupt();
       }
       ReportingUtils.logDebugMessage("Scheduler in AnimationController was shut down");
