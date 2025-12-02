@@ -199,6 +199,7 @@ public final class DisplayUIController implements Closeable, WindowListener,
    // controller's notion of what's current)
    private final List<String> displayedAxes_ = new ArrayList<>();
    private final List<Integer> displayedAxisLengths_ = new ArrayList<>();
+   private final Map<String, Integer> displayedAxesIndexMap_ = new HashMap<>(); // O(1) lookup for axis indices
    private ImagesAndStats displayedImages_;
    private List<Coords> cachedDisplayedCoords_ = null; // Cache for getAllDisplayedCoords()
    private List<String> lastScrollableAxes_ = null; // Cache for early exit in expandDisplayedRangeToInclude
@@ -785,12 +786,16 @@ public final class DisplayUIController implements Closeable, WindowListener,
          for (String axis : c.getAxes()) {
             if (axis != null) {
                int index = c.getIndex(axis);
-               int axisIndex = displayedAxes_.indexOf(axis);
-               if (axisIndex == -1) {
+               // Use O(1) HashMap lookup instead of O(N) ArrayList.indexOf()
+               Integer axisIndexObj = displayedAxesIndexMap_.get(axis);
+               if (axisIndexObj == null) {
+                  int newAxisIndex = displayedAxes_.size();
                   displayedAxes_.add(axis);
                   displayedAxisLengths_.add(index + 1);
+                  displayedAxesIndexMap_.put(axis, newAxisIndex);
                   axesChanged = true;
                } else {
+                  int axisIndex = axisIndexObj;
                   int oldLength = displayedAxisLengths_.get(axisIndex);
                   int newLength = Math.max(oldLength, index + 1);
                   if (newLength != oldLength) {
@@ -1333,11 +1338,12 @@ public final class DisplayUIController implements Closeable, WindowListener,
 
       int checkedLength = length;
       if (checkedLength < 0) {
-         int axisIndex = displayedAxes_.indexOf(axis);
-         if (axisIndex < 0) {
+         // Use O(1) HashMap lookup instead of O(N) ArrayList.indexOf()
+         Integer axisIndexObj = displayedAxesIndexMap_.get(axis);
+         if (axisIndexObj == null) {
             return;
          }
-         checkedLength = displayedAxisLengths_.get(axisIndex);
+         checkedLength = displayedAxisLengths_.get(axisIndexObj);
       }
       if (checkedLength <= 1) {
          return; // Not displayed
@@ -1966,15 +1972,17 @@ public final class DisplayUIController implements Closeable, WindowListener,
    }
 
    public boolean isAxisDisplayed(String axis) {
-      return displayedAxes_.contains(axis);
+      // Use O(1) HashMap lookup instead of O(N) ArrayList.contains()
+      return displayedAxesIndexMap_.containsKey(axis);
    }
 
    public int getDisplayedAxisLength(String axis) {
-      int axisIndex = displayedAxes_.indexOf(axis);
-      if (axisIndex == -1) {
+      // Use O(1) HashMap lookup instead of O(N) ArrayList.indexOf()
+      Integer axisIndexObj = displayedAxesIndexMap_.get(axis);
+      if (axisIndexObj == null) {
          return 0;
       }
-      return displayedAxisLengths_.get(axisIndex);
+      return displayedAxisLengths_.get(axisIndexObj);
    }
 
    public List<Coords> getAllDisplayedCoords() {
