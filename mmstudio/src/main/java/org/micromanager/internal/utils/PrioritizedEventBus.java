@@ -7,10 +7,7 @@ import com.google.common.eventbus.EventBus;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
 
 /**
  * The PrioritizedEventBus allows registrants to provide a priority value; when
@@ -33,16 +30,8 @@ public final class PrioritizedEventBus {
       async_ = async;
 
       if (async) {
-         // Use bounded queue to prevent unbounded growth during high-speed acquisition
-         // Queue size: 200 events = ~2 seconds of backlog at 100 FPS
-         // DiscardOldestPolicy: Drop stale events when full to maintain responsiveness
-         executorService_ = new ThreadPoolExecutor(
-               1, 1,  // Single thread (maintains execution order)
-               0L, TimeUnit.MILLISECONDS,
-               new ArrayBlockingQueue<Runnable>(200),  // BOUNDED: max 200 events queued
-               ThreadFactoryFactory.createThreadFactory("PrioritizedEventBus"),
-               new ThreadPoolExecutor.DiscardOldestPolicy()  // Drop oldest events when full
-         );
+         executorService_ = newSingleThreadExecutor(
+               ThreadFactoryFactory.createThreadFactory("PrioritizedEventBus"));
       }
 
    }
