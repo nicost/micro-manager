@@ -866,6 +866,9 @@ public final class DisplayController extends DisplayWindowAPIAdapter
 
    @Override
    public void animationShouldDisplayDataPosition(Coords position) {
+      // Diagnostic: Track when AnimationController requests position updates
+      ReportingUtils.logMessage("DIAG: animationShouldDisplayDataPosition - position=" + position);
+
       if (perfMon_ != null) {
          perfMon_.sampleTimeInterval("Coords from animation controller");
       }
