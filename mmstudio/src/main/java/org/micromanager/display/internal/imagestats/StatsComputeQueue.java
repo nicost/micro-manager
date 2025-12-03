@@ -150,7 +150,11 @@ public final class StatsComputeQueue {
       // when we can't keep up, ensuring we always display the most recent data.
 
       // Update the pending coords for this priority
+      while (pendingRequestCoords_.size() <= priority) {
+         pendingRequestCoords_.add(null);
+      }
       pendingRequestCoords_.set(priority, requestCoords);
+
       while (pendingRequestStartTime_.size() <= priority) {
          pendingRequestStartTime_.add(null);
       }
