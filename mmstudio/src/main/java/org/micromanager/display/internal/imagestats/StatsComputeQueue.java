@@ -138,40 +138,16 @@ public final class StatsComputeQueue {
       int priority = request.getNumberOfImages();
       Coords requestCoords = request.getNominalCoords();
 
-      // Check if there's already a pending request for this priority
-      // If so, skip this request to avoid falling behind during high-speed acquisition
-      while (pendingRequestCoords_.size() <= priority) {
-         pendingRequestCoords_.add(null);
-      }
+      // Diagnostic: Track ALL incoming requests
+      ReportingUtils.logMessage("DIAG: submitRequest ENTRY - seqNum=" + sequenceNumber
+            + ", coords=" + requestCoords);
 
-      Coords pendingCoords = pendingRequestCoords_.get(priority);
-      if (pendingCoords != null && pendingCoords.equals(requestCoords)) {
-         // Same coordinates already pending - but if it's been pending too long,
-         // allow a new request to go through (previous one may be stuck)
-         while (pendingRequestStartTime_.size() <= priority) {
-            pendingRequestStartTime_.add(null);
-         }
-         Long pendingStartTime = pendingRequestStartTime_.get(priority);
-         if (pendingStartTime != null) {
-            long timeSincePendingMs = (nowNs - pendingStartTime) / 1_000_000L;
+      // Don't throttle here - let bypass mechanism and display throttling handle frame rate.
+      // Previously throttled at 33ms which caused old images to be processed instead of new ones
+      // during high-speed acquisition, making display appear frozen.
 
-            // Use fixed 33ms timeout for 30 FPS display updates
-            // This allows bypass mechanism to provide frequent display updates
-            // while preventing burst duplicates in live mode
-            if (timeSincePendingMs < 33) {
-               // Recent pending request, skip this one
-               if (perfMon_ != null) {
-                  perfMon_.sampleTimeInterval("Request skipped - same coords pending");
-               }
-               return;
-            } else {
-               // Old pending request, allow this one through
-               if (perfMon_ != null) {
-                  perfMon_.sampleTimeInterval("Request allowed - old pending cleared");
-               }
-            }
-         }
-      }
+      // Note: The bypass executor and result buffer coalescing will naturally drop old frames
+      // when we can't keep up, ensuring we always display the most recent data.
 
       // Update the pending coords for this priority
       pendingRequestCoords_.set(priority, requestCoords);
