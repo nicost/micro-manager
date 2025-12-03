@@ -171,11 +171,13 @@ public final class AnimationController<P> {
          // Wait up to 5 seconds for graceful shutdown
          if (!scheduler_.awaitTermination(5, TimeUnit.SECONDS)) {
             // Force shutdown if graceful shutdown times out
-            ReportingUtils.logMessage("AnimationController scheduler did not terminate gracefully, forcing shutdown");
+            ReportingUtils.logMessage(
+                  "AnimationController scheduler did not terminate gracefully, forcing shutdown");
             scheduler_.shutdownNow();
             // Wait a bit more for forced shutdown
             if (!scheduler_.awaitTermination(2, TimeUnit.SECONDS)) {
-               ReportingUtils.logError("AnimationController scheduler did not terminate after forced shutdown");
+               ReportingUtils.logError(
+                     "AnimationController scheduler did not terminate after forced shutdown");
             }
          }
       } catch (InterruptedException notUsedByUs) {

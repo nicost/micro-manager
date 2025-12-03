@@ -110,8 +110,10 @@ public final class DisplayController extends DisplayWindowAPIAdapter
    // Adaptive display throttling - reduce display rate during high-speed acquisition
    // to minimize resource consumption and prevent circular buffer overflows
    private static final long BASE_REPAINT_PERIOD_NS = Math.round(1e9 / 60.0); // 60 FPS normal
-   private static final long HIGH_SPEED_REPAINT_PERIOD_NS = Math.round(1e9 / 30.0); // 30 FPS high-speed
-   private static final long VERY_HIGH_SPEED_REPAINT_PERIOD_NS = Math.round(1e9 / 15.0); // 15 FPS very high-speed
+   private static final long HIGH_SPEED_REPAINT_PERIOD_NS =
+            Math.round(1e9 / 30.0); // 30 FPS high-speed
+   private static final long VERY_HIGH_SPEED_REPAINT_PERIOD_NS =
+            Math.round(1e9 / 15.0); // 15 FPS very high-speed
 
    // Thresholds for switching display rates based on estimated camera FPS
    private static final double HIGH_SPEED_THRESHOLD_FPS = 30.0;
@@ -1126,7 +1128,8 @@ public final class DisplayController extends DisplayWindowAPIAdapter
    private class ExpandDisplayRangeCoalescentRunnable
          implements CoalescentRunnable {
       private final List<Coords> coords_ = new ArrayList<>();
-      private static final int MAX_COALESCED_COORDS = 100;  // Limit accumulation to prevent EDT blocking
+      // Limit accumulation to prevent EDT blocking
+      private static final int MAX_COALESCED_COORDS = 100;
 
       ExpandDisplayRangeCoalescentRunnable(Coords coords) {
          coords_.add(coords);
