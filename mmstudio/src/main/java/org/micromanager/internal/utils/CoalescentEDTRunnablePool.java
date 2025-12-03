@@ -17,7 +17,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicBoolean;
 import javax.swing.SwingUtilities;
 import org.micromanager.internal.utils.ReportingUtils;
 
@@ -31,7 +30,6 @@ public class CoalescentEDTRunnablePool {
    // Guarded by monitor on this
    private final Map<Class<?>, CoalescentRunnable> coalescedRunnables_ = new HashMap<>();
    private final Map<Class<?>, Long> coalescedTimestamps_ = new HashMap<>();  // Track entry creation time
-   private final Map<Class<?>, AtomicBoolean> hasScheduledTask_ = new HashMap<>();  // Track if invokeLater task pending
    private final Map<Class<?>, Long> skipCounts_ = new HashMap<>();
    private static final long STALE_ENTRY_TIMEOUT_NS = 5_000_000_000L;  // 5 seconds
 
@@ -60,8 +58,6 @@ public class CoalescentEDTRunnablePool {
     */
    public void invokeLaterWithCoalescence(CoalescentRunnable runnable) {
       final Class<?> coalescenceClass = runnable.getCoalescenceClass();
-
-      boolean needsSchedule;
       synchronized (this) {
          // Clean up stale entries that have been waiting > 5 seconds
          cleanStaleEntries();
@@ -75,31 +71,20 @@ public class CoalescentEDTRunnablePool {
          }
          coalescedRunnables_.put(coalescenceClass, coalesced);
          coalescedTimestamps_.put(coalescenceClass, System.nanoTime());
+      }
 
-         // Check if we need to schedule a task (prevents unbounded AWT Event Queue growth)
-         AtomicBoolean hasTask = hasScheduledTask_.get(coalescenceClass);
-         if (hasTask == null) {
-            hasTask = new AtomicBoolean(false);
-            hasScheduledTask_.put(coalescenceClass, hasTask);
+      SwingUtilities.invokeLater(() -> {
+         final CoalescentRunnable coalesced;
+         synchronized (CoalescentEDTRunnablePool.this) {
+            coalesced = coalescedRunnables_.remove(coalescenceClass);
+            coalescedTimestamps_.remove(coalescenceClass);
          }
-         needsSchedule = !hasTask.getAndSet(true);  // Only schedule if no task pending
-      }
+         if (coalesced == null) {
+            return; // Already handled by previous invocations
+         }
 
-      // ONLY schedule invokeLater if no task is already pending for this coalescence class
-      // This prevents 19,000+ tasks from queueing on the AWT Event Queue
-      if (needsSchedule) {
-         SwingUtilities.invokeLater(() -> {
-            CoalescentRunnable toRun;
-            synchronized (CoalescentEDTRunnablePool.this) {
-               toRun = coalescedRunnables_.remove(coalescenceClass);
-               coalescedTimestamps_.remove(coalescenceClass);
-               hasScheduledTask_.get(coalescenceClass).set(false);  // Mark task as complete
-            }
-            if (toRun != null) {
-               toRun.run();
-            }
-         });
-      }
+         coalesced.run();
+      });
    }
 
    /**
@@ -115,8 +100,6 @@ public class CoalescentEDTRunnablePool {
    public void invokeAsLateAsPossibleWithCoalescence(
          CoalescentRunnable runnable) {
       final Class<?> coalescenceClass = runnable.getCoalescenceClass();
-
-      boolean needsSchedule;
       synchronized (this) {
          CoalescentRunnable coalesced =
                coalescedRunnables_.get(coalescenceClass);
@@ -131,44 +114,31 @@ public class CoalescentEDTRunnablePool {
          }
          coalescedRunnables_.put(coalescenceClass, coalesced);
          coalescedTimestamps_.put(coalescenceClass, System.nanoTime());
-
-         // Check if we need to schedule a task (prevents unbounded AWT Event Queue growth)
-         AtomicBoolean hasTask = hasScheduledTask_.get(coalescenceClass);
-         if (hasTask == null) {
-            hasTask = new AtomicBoolean(false);
-            hasScheduledTask_.put(coalescenceClass, hasTask);
-         }
-         needsSchedule = !hasTask.getAndSet(true);  // Only schedule if no task pending
       }
 
-      // ONLY schedule invokeLater if no task is already pending for this coalescence class
-      // This prevents 19,000+ tasks from queueing on the AWT Event Queue
-      if (needsSchedule) {
-         SwingUtilities.invokeLater(() -> {
-            CoalescentRunnable toRun;
-            synchronized (CoalescentEDTRunnablePool.this) {
-               Long skipCount = skipCounts_.get(coalescenceClass);
-               if (skipCount != null && skipCount > 0) {
-                  long newCount = skipCount - 1;
-                  if (newCount == 0) {
-                     // Remove entry when count reaches 0 to prevent unbounded HashMap growth
-                     skipCounts_.remove(coalescenceClass);
-                  } else {
-                     skipCounts_.put(coalescenceClass, newCount);
-                  }
-                  // Don't clear hasScheduledTask flag - let it re-schedule
-                  hasScheduledTask_.get(coalescenceClass).set(false);
-                  return;
+      SwingUtilities.invokeLater(() -> {
+         final CoalescentRunnable coalesced;
+         synchronized (CoalescentEDTRunnablePool.this) {
+            Long skipCount = skipCounts_.get(coalescenceClass);
+            if (skipCount != null && skipCount > 0) {
+               long newCount = skipCount - 1;
+               if (newCount == 0) {
+                  // Remove entry when count reaches 0 to prevent unbounded HashMap growth
+                  skipCounts_.remove(coalescenceClass);
+               } else {
+                  skipCounts_.put(coalescenceClass, newCount);
                }
-               toRun = coalescedRunnables_.remove(coalescenceClass);
-               coalescedTimestamps_.remove(coalescenceClass);
-               hasScheduledTask_.get(coalescenceClass).set(false);  // Mark task as complete
+               return;
             }
-            if (toRun != null) {
-               toRun.run();
-            }
-         });
-      }
+            coalesced = coalescedRunnables_.remove(coalescenceClass);
+            coalescedTimestamps_.remove(coalescenceClass);
+         }
+         if (coalesced == null) {
+            return; // Be defensive
+         }
+
+         coalesced.run();
+      });
    }
 
    /**
@@ -194,11 +164,6 @@ public class CoalescentEDTRunnablePool {
             coalescedRunnables_.remove(key);
             coalescedTimestamps_.remove(key);
             skipCounts_.remove(key);  // Also clean up skip counts
-            // Clean up task tracking - reset flag so new tasks can be scheduled
-            AtomicBoolean hasTask = hasScheduledTask_.get(key);
-            if (hasTask != null) {
-               hasTask.set(false);
-            }
          }
       }
    }
