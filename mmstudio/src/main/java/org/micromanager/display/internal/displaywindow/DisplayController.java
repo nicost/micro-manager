@@ -386,7 +386,14 @@ public final class DisplayController extends DisplayWindowAPIAdapter
       scheduleDisplayInUI(stats);
 
       // Return adaptive throttle period based on camera speed
-      return getAdaptiveRepaintPeriodNs();
+      long throttleNs = getAdaptiveRepaintPeriodNs();
+
+      // Diagnostic: Log throttle interval being returned
+      ReportingUtils.logMessage("DIAG: imageStatsReady - returning throttle = "
+            + TimeUnit.NANOSECONDS.toMillis(throttleNs) + "ms (cameraFps = "
+            + estimatedCameraFps_ + ")");
+
+      return throttleNs;
    }
 
    /**

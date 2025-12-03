@@ -20,8 +20,10 @@ import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang3.event.EventListenerSupport;
 import org.micromanager.data.Coords;
+import org.micromanager.internal.utils.ReportingUtils;
 import org.micromanager.internal.utils.ThreadFactoryFactory;
 import org.micromanager.internal.utils.performance.PerformanceMonitor;
 
@@ -359,6 +361,11 @@ public final class StatsComputeQueue {
             synchronized (StatsComputeQueue.this) {
                waitNs = nextStatsReadyCallAllowedNs_ - System.nanoTime();
             }
+
+            // Diagnostic: Log wait time before calling imageStatsReady
+            ReportingUtils.logMessage("DIAG: StatsComputeQueue - waiting "
+                  + TimeUnit.NANOSECONDS.toMillis(Math.max(0, waitNs)) + "ms before imageStatsReady");
+
             if (perfMon_ != null) {
                perfMon_.sample("Compute result pre-wait (ms)", Math.max(0, waitNs / 1000000));
             }
@@ -371,6 +378,11 @@ public final class StatsComputeQueue {
 
             synchronized (StatsComputeQueue.this) {
                long intervalNs = listeners_.fire().imageStatsReady(result);
+
+               // Diagnostic: Log interval returned from imageStatsReady
+               ReportingUtils.logMessage("DIAG: StatsComputeQueue - received throttle interval = "
+                     + TimeUnit.NANOSECONDS.toMillis(intervalNs) + "ms");
+
                nextStatsReadyCallAllowedNs_ = System.nanoTime() + intervalNs;
             }
          }
