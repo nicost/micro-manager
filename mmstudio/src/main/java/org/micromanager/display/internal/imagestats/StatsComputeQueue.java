@@ -67,12 +67,13 @@ public final class StatsComputeQueue {
    private final List<Future<?>> bypassFutures_ =
          new ArrayList<Future<?>>();
 
-   // Outstanding results by priority. We keep 1 slot per priority and always
-   // replace with the latest to avoid falling behind during high-speed acquisition
+   // Outstanding results by priority. Allow sufficient buffer to prevent
+   // slow stats computation from blocking bypass results during high-speed acquisition.
+   // Buffer of 3 allows: current executing + next bypass + next real stats
    // Guarded by monitor on this
    private final List<Deque<Future<?>>> resultFutures_ =
          new ArrayList<Deque<Future<?>>>();
-   private static final int RESULT_BUFFER_SIZE = 1;
+   private static final int RESULT_BUFFER_SIZE = 3;
 
    // Serial number for each request received
    private long nextRequestSequenceNumber_ = 0;
