@@ -990,14 +990,29 @@ public final class DisplayUIController implements Closeable, WindowListener,
          }
 
          try {
+            // Diagnostic: Track ImageJ bridge calls that actually render to screen
+            long ijStartNs = System.nanoTime();
+            ReportingUtils.logMessage("DIAG: displayImages - calling ijBridge.mm2ijSetDisplayPosition");
+
             ijBridge_.mm2ijSetDisplayPosition(nominalCoords);
+
+            long ijDurationMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - ijStartNs);
+            ReportingUtils.logMessage("DIAG: displayImages - ijBridge.mm2ijSetDisplayPosition completed in "
+                  + ijDurationMs + "ms");
          } catch (Exception e) {
             ReportingUtils.logError(e, "Exception setting display position");
             // Don't re-throw - continue with other operations
          }
 
          try {
+            long autoStartNs = System.nanoTime();
             applyAutostretch(images, displayController_.getDisplaySettings());
+
+            long autoDurationMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - autoStartNs);
+            if (autoDurationMs > 5) {
+               ReportingUtils.logMessage("DIAG: displayImages - applyAutostretch took "
+                     + autoDurationMs + "ms");
+            }
          } catch (Exception e) {
             ReportingUtils.logError(e, "Exception applying autostretch");
             // Don't re-throw - continue with other operations
