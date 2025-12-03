@@ -877,6 +877,11 @@ public final class DisplayUIController implements Closeable, WindowListener,
 
    @MustCallOnEDT
    void displayImages(ImagesAndStats images) {
+      // Diagnostic: Track entry to displayImages
+      long startTimeNs = System.nanoTime();
+      ReportingUtils.logMessage("DIAG: displayImages() ENTRY - repaintScheduled = "
+            + repaintScheduledForNewImages_.get());
+
       if (scheduledDisplayFuture_ != null && !scheduledDisplayFuture_.isDone()) {
          // Use cancel(true) to ensure task is interrupted and removed from queue
          scheduledDisplayFuture_.cancel(true);
@@ -898,6 +903,10 @@ public final class DisplayUIController implements Closeable, WindowListener,
             repaintScheduledForNewImages_.set(false);
             repaintFlagSetTimeNs_ = 0;
          } else {
+            // Diagnostic: Log early return due to repaint flag
+            ReportingUtils.logMessage("DIAG: displayImages() EARLY RETURN - "
+                  + "repaint already scheduled for "
+                  + TimeUnit.NANOSECONDS.toMillis(now - repaintFlagSetTimeNs_) + "ms");
             scheduledDisplayFuture_ = scheduleSkippedImages(images);
             return;
          }
@@ -1014,6 +1023,10 @@ public final class DisplayUIController implements Closeable, WindowListener,
          // CRITICAL: Always reset flag to prevent permanent freeze
          // This runs even if exception occurs or return is called
          repaintScheduledForNewImages_.set(false);
+
+         // Diagnostic: Track exit from displayImages with execution time
+         long durationMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startTimeNs);
+         ReportingUtils.logMessage("DIAG: displayImages() EXIT - duration = " + durationMs + "ms");
 
          if (perfMon_ != null) {
             perfMon_.sampleTimeInterval("displayImages completed");

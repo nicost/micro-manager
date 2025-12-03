@@ -449,6 +449,10 @@ public final class DisplayController extends DisplayWindowAPIAdapter
       // Check if too many display runnables are pending to prevent memory buildup
       int currentPending = pendingDisplayRunnables_.get();
 
+      // Diagnostic: ALWAYS log to track if this method is being called
+      ReportingUtils.logMessage("DIAG: scheduleDisplayInUI ENTRY - pending count = "
+            + currentPending + " (threshold = " + MAX_PENDING_DISPLAYS + ")");
+
       if (currentPending >= MAX_PENDING_DISPLAYS) {
          long now = System.nanoTime();
 
@@ -476,6 +480,12 @@ public final class DisplayController extends DisplayWindowAPIAdapter
             pendingDisplayRunnables_.set(MAX_PENDING_DISPLAYS - 1);
             counterMaxSinceNs_.set(0);  // Reset for next potential stuck state
          } else {
+            // Diagnostic: Log when we skip display updates due to full queue
+            ReportingUtils.logMessage("DIAG: Skipping display update - counter stuck at "
+                  + currentPending + " for "
+                  + TimeUnit.NANOSECONDS.toMillis(now - stuckSince) + "ms (timeout = "
+                  + TimeUnit.NANOSECONDS.toMillis(COUNTER_RESET_TIMEOUT_NS) + "ms)");
+
             if (perfMon_ != null) {
                perfMon_.sampleTimeInterval("Display scheduling skipped - queue full");
             }
@@ -530,8 +540,13 @@ public final class DisplayController extends DisplayWindowAPIAdapter
 
          @Override
          public void run() {
+            // Diagnostic: Track coalescent runnable execution
+            ReportingUtils.logMessage("DIAG: DisplayController coalescent runnable RUN - "
+                  + "pending=" + pendingDisplayRunnables_.get());
+
             try {
                if (uiController_ == null) { // Closed
+                  ReportingUtils.logMessage("DIAG: DisplayController runnable - uiController is NULL, returning");
                   return;
                }
 
@@ -611,6 +626,12 @@ public final class DisplayController extends DisplayWindowAPIAdapter
             } finally {
                // Decrement counter to allow new display updates
                int newCount = pendingDisplayRunnables_.decrementAndGet();
+
+               // Diagnostic: Log counter changes at high load
+               if (newCount >= MAX_PENDING_DISPLAYS - 3) {
+                  ReportingUtils.logMessage("DIAG: Display runnable completed - "
+                        + "counter decremented to " + newCount);
+               }
 
                // Safety check: if counter was stuck at max but we're completing,
                // ensure timeout marker is reset to prevent permanent stuck state
