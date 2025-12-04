@@ -329,6 +329,9 @@ public final class AnimationController<P> {
     * @param newPosition The new position to be displayed.
     */
    public synchronized void newDataPosition(final Coords newPosition) {
+      org.micromanager.internal.utils.ReportingUtils.logMessage(
+            "DIAG: AnimationController.newDataPosition - coords=" + newPosition);
+
       // Mode may have switched since scheduling a snap-back, so cancel it here
       if (snapBackFuture_ != null) {
          snapBackFuture_.cancel(false);
@@ -394,6 +397,8 @@ public final class AnimationController<P> {
                   didJumpToNewPosition_ = true;
                }
                // Fire listeners without holding lock to avoid deadlock
+               org.micromanager.internal.utils.ReportingUtils.logMessage(
+                     "DIAG: AnimationController - FIRING animationShouldDisplayDataPosition (flash-back) for " + newDisplayPosition);
                listeners_.fire().animationAcknowledgeDataPosition(newPosition);
                listeners_.fire().animationWillJumpToNewDataPosition(newDisplayPosition);
                listeners_.fire().animationShouldDisplayDataPosition(newDisplayPosition);
@@ -454,6 +459,8 @@ public final class AnimationController<P> {
                // Fire listeners without holding lock to avoid deadlock
                listeners_.fire().animationAcknowledgeDataPosition(newPosition);
                if (positionChanged) {
+                  org.micromanager.internal.utils.ReportingUtils.logMessage(
+                        "DIAG: AnimationController - FIRING animationShouldDisplayDataPosition (ignored-axis) for " + newDisplayPosition);
                   listeners_.fire().animationWillJumpToNewDataPosition(newDisplayPosition);
                   listeners_.fire().animationShouldDisplayDataPosition(newDisplayPosition);
                   listeners_.fire().animationDidJumpToNewDataPosition(newDisplayPosition);
@@ -472,6 +479,8 @@ public final class AnimationController<P> {
                   didJumpToNewPosition_ = true;
                }
                // Fire listeners without holding lock to avoid deadlock
+               org.micromanager.internal.utils.ReportingUtils.logMessage(
+                     "DIAG: AnimationController - FIRING animationShouldDisplayDataPosition for " + newPosition);
                listeners_.fire().animationWillJumpToNewDataPosition(newPosition);
                listeners_.fire().animationShouldDisplayDataPosition(newPosition);
                listeners_.fire().animationDidJumpToNewDataPosition(newPosition);
