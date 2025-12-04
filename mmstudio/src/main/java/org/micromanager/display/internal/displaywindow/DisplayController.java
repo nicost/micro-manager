@@ -155,16 +155,17 @@ public final class DisplayController extends DisplayWindowAPIAdapter
    // Track pending display runnables to prevent memory accumulation
    private final AtomicInteger pendingDisplayRunnables_ = new AtomicInteger(0);
    // Maximum number of pending display runnables to prevent memory accumulation.
-   // Set to 10 to provide buffer during high-speed acquisition while still
-   // preventing unbounded growth. Works with timeout-based reset mechanism.
-   private static final int MAX_PENDING_DISPLAYS = 10;
+   // Set to 2 to enable aggressive frame dropping at high frame rates - ensures
+   // display shows newest frames instead of accumulating old ones.
+   // Works with AnimationController coalescence to keep display current.
+   private static final int MAX_PENDING_DISPLAYS = 2;
 
    // Track when counter has been stuck at maximum to enable recovery.
    // If counter stays at MAX for more than COUNTER_RESET_TIMEOUT_NS,
    // we force a reset to allow at least one display update through.
    // Using AtomicLong for thread-safe compareAndSet operations.
    private final AtomicLong counterMaxSinceNs_ = new AtomicLong(0);
-   private static final long COUNTER_RESET_TIMEOUT_NS = 500_000_000L; // 500ms timeout
+   private static final long COUNTER_RESET_TIMEOUT_NS = 100_000_000L; // 100ms timeout (reduced from 500ms)
 
    // Track image arrival times to estimate camera FPS for adaptive throttling
    private static final int IMAGE_TIMING_WINDOW_SIZE = 10;
