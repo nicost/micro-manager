@@ -1103,6 +1103,8 @@ public final class DisplayController extends DisplayWindowAPIAdapter
     */
    @Subscribe
    public void onNewImage(final DataProviderHasNewImageEvent event) {
+      ReportingUtils.logMessage("DIAG: onNewImage - coords=" + event.getImage().getCoords());
+
       // Track image arrival time for adaptive display throttling
       long now = System.nanoTime();
       imageArrivalTimes_[imageTimingIndex_] = now;
@@ -1126,6 +1128,7 @@ public final class DisplayController extends DisplayWindowAPIAdapter
       // any ongoing playback animation. Actual display of new images happens
       // upon receiving callbacks via the AnimationController.Listener
       // interface.
+      ReportingUtils.logMessage("DIAG: onNewImage - calling animationController.newDataPosition");
       animationController_.newDataPosition(event.getImage().getCoords());
    }
 
