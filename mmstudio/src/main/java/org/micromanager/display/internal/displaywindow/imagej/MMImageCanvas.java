@@ -407,8 +407,10 @@ public final class MMImageCanvas extends ImageCanvas
 
    @Override
    public void repaint() {
-      // Diagnostic: Track repaint call count
-      repaintCallCount_.incrementAndGet();
+      // Diagnostic: Track repaint call count (may be null during construction)
+      if (repaintCallCount_ != null) {
+         repaintCallCount_.incrementAndGet();
+      }
 
       // repaint is the easiest (and only practical) place to detect ImageJ
       // ROI change
@@ -420,8 +422,10 @@ public final class MMImageCanvas extends ImageCanvas
 
    @Override
    public void repaint(int x, int y, int w, int h) {
-      // Diagnostic: Track repaint call count
-      repaintCallCount_.incrementAndGet();
+      // Diagnostic: Track repaint call count (may be null during construction)
+      if (repaintCallCount_ != null) {
+         repaintCallCount_.incrementAndGet();
+      }
 
       if (parent_ != null) {
          parent_.ij2mmRoiMayHaveChanged();
