@@ -450,6 +450,7 @@ public final class DisplayController extends DisplayWindowAPIAdapter
       int currentPending = pendingDisplayRunnables_.get();
 
       if (currentPending >= MAX_PENDING_DISPLAYS) {
+         ReportingUtils.logMessage("DIAG: scheduleDisplayInUI - counter at MAX (" + currentPending + "), checking timeout");
          long now = System.nanoTime();
 
          // Thread-safe: Try to set timeout start time if not already set
@@ -472,10 +473,13 @@ public final class DisplayController extends DisplayWindowAPIAdapter
                perfMon_.sample("Pending count at timeout", currentPending);
                perfMon_.sample("Display counter forced reset after timeout", 1);
             }
+            ReportingUtils.logMessage("DIAG: scheduleDisplayInUI - TIMEOUT! Forcing counter reset from "
+                  + currentPending + " to " + (MAX_PENDING_DISPLAYS - 1));
             // Force reset to allow at least one display update through
             pendingDisplayRunnables_.set(MAX_PENDING_DISPLAYS - 1);
             counterMaxSinceNs_.set(0);  // Reset for next potential stuck state
          } else {
+            ReportingUtils.logMessage("DIAG: scheduleDisplayInUI - BLOCKED (counter=" + currentPending + ", timeout not reached yet)");
             if (perfMon_ != null) {
                perfMon_.sampleTimeInterval("Display scheduling skipped - queue full");
             }
@@ -486,7 +490,8 @@ public final class DisplayController extends DisplayWindowAPIAdapter
          counterMaxSinceNs_.set(0);
       }
 
-      pendingDisplayRunnables_.incrementAndGet();
+      int newPending = pendingDisplayRunnables_.incrementAndGet();
+      ReportingUtils.logMessage("DIAG: scheduleDisplayInUI - incremented counter to " + newPending);
 
       // A note about congestion of event queue by excessive paint events:
       //
@@ -611,6 +616,7 @@ public final class DisplayController extends DisplayWindowAPIAdapter
             } finally {
                // Decrement counter to allow new display updates
                int newCount = pendingDisplayRunnables_.decrementAndGet();
+               ReportingUtils.logMessage("DIAG: Display runnable DONE - decremented counter to " + newCount);
 
                // Safety check: if counter was stuck at max but we're completing,
                // ensure timeout marker is reset to prevent permanent stuck state
