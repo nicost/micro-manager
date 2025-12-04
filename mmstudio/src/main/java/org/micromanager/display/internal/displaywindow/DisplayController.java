@@ -738,6 +738,7 @@ public final class DisplayController extends DisplayWindowAPIAdapter
 
    @Override
    protected Coords handleDisplayPosition(Coords position) {
+      ReportingUtils.logMessage("DIAG: handleDisplayPosition ENTRY - coords=" + position);
       if (perfMon_ != null) {
          perfMon_.sampleTimeInterval("Handle display position");
       }
@@ -834,9 +835,11 @@ public final class DisplayController extends DisplayWindowAPIAdapter
       if (perfMon_ != null) {
          perfMon_.sampleTimeInterval("Submitting compute request");
       }
+      ReportingUtils.logMessage("DIAG: handleDisplayPosition - calling computeQueue_.submitRequest for " + position);
       computeQueue_.submitRequest(ImageStatsRequest.create(position,
             images,
             selection));
+      ReportingUtils.logMessage("DIAG: handleDisplayPosition EXIT");
 
       return position;
    }
@@ -848,6 +851,7 @@ public final class DisplayController extends DisplayWindowAPIAdapter
 
    @Override
    public void animationShouldDisplayDataPosition(Coords position) {
+      ReportingUtils.logMessage("DIAG: animationShouldDisplayDataPosition ENTRY - coords=" + position);
       if (perfMon_ != null) {
          perfMon_.sampleTimeInterval("Coords from animation controller");
       }
@@ -861,7 +865,9 @@ public final class DisplayController extends DisplayWindowAPIAdapter
       // automatically by the compute queue based on result retrieval.
 
       // Set the "official" position of this data viewer
+      ReportingUtils.logMessage("DIAG: animationShouldDisplayDataPosition - calling setDisplayPosition");
       setDisplayPosition(position, true);
+      ReportingUtils.logMessage("DIAG: animationShouldDisplayDataPosition EXIT");
    }
 
    @Override
