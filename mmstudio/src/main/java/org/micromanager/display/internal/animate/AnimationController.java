@@ -110,6 +110,9 @@ public final class AnimationController<P> {
    private ScheduledFuture<?> snapBackFuture_;
    private P snapBackPosition_;
 
+   // Track pending display task to enable coalescence at high frame rates
+   private ScheduledFuture<?> pendingDisplayFuture_;
+
    private boolean didJumpToNewPosition_;
 
    private PerformanceMonitor perfMon_;
@@ -163,6 +166,10 @@ public final class AnimationController<P> {
          if (snapBackFuture_ != null) {
             snapBackFuture_.cancel(true);
             snapBackFuture_ = null;
+         }
+         if (pendingDisplayFuture_ != null) {
+            pendingDisplayFuture_.cancel(true);
+            pendingDisplayFuture_ = null;
          }
       }
 
@@ -337,6 +344,12 @@ public final class AnimationController<P> {
          snapBackFuture_.cancel(false);
          snapBackFuture_ = null;
       }
+
+      // Cancel any pending display task to prevent queue backlog at high frame rates
+      if (pendingDisplayFuture_ != null && !pendingDisplayFuture_.isDone()) {
+         pendingDisplayFuture_.cancel(false);
+         pendingDisplayFuture_ = null;
+      }
       if (didJumpToNewPosition_) {
          didJumpToNewPosition_ = false;
          if (newDataPositionExpiredFuture_ != null) {
@@ -389,11 +402,12 @@ public final class AnimationController<P> {
             snapBackFuture_ = null;
          }
          snapBackPosition_ = (P) snapBackPosition;
-         scheduler_.schedule(new Runnable() {
+         pendingDisplayFuture_ = scheduler_.schedule(new Runnable() {
             @Override
             public void run() {
-               // Update state while holding lock
+               // Clear pending future at start of execution
                synchronized (AnimationController.this) {
+                  pendingDisplayFuture_ = null;
                   didJumpToNewPosition_ = true;
                }
                // Fire listeners without holding lock to avoid deadlock
@@ -445,12 +459,13 @@ public final class AnimationController<P> {
          }, newPositionFlashDurationMs_, TimeUnit.MILLISECONDS);
 
       } else if (foundAxisToBeIgnored) {
-         scheduler_.schedule(new Runnable() {
+         pendingDisplayFuture_ = scheduler_.schedule(new Runnable() {
             @Override
             public void run() {
-               // Update state while holding lock
+               // Clear pending future and update state while holding lock
                boolean positionChanged = !newDisplayPosition.equals(oldPosition);
                synchronized (AnimationController.this) {
+                  pendingDisplayFuture_ = null;
                   if (positionChanged) {
                      sequencer_.setAnimationPosition((P) newDisplayPosition);
                      didJumpToNewPosition_ = true;
@@ -470,11 +485,12 @@ public final class AnimationController<P> {
             }
          }, 0, TimeUnit.MILLISECONDS);
       } else { // no axis locked
-         scheduler_.schedule(new Runnable() {
+         pendingDisplayFuture_ = scheduler_.schedule(new Runnable() {
             @Override
             public void run() {
-               // Update state while holding lock
+               // Clear pending future and update state while holding lock
                synchronized (AnimationController.this) {
+                  pendingDisplayFuture_ = null;
                   sequencer_.setAnimationPosition((P) newPosition);
                   didJumpToNewPosition_ = true;
                }
