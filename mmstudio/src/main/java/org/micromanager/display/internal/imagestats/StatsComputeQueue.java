@@ -138,10 +138,6 @@ public final class StatsComputeQueue {
       int priority = request.getNumberOfImages();
       Coords requestCoords = request.getNominalCoords();
 
-      // Diagnostic: Track ALL incoming requests
-      ReportingUtils.logMessage("DIAG: submitRequest ENTRY - seqNum=" + sequenceNumber
-            + ", coords=" + requestCoords);
-
       // Don't throttle here - let bypass mechanism and display throttling handle frame rate.
       // Previously throttled at 33ms which caused old images to be processed instead of new ones
       // during high-speed acquisition, making display appear frozen.
@@ -231,9 +227,6 @@ public final class StatsComputeQueue {
                perfMon_.sampleTimeInterval("Compute submitting result");
             }
 
-            // Diagnostic: Track when stats computation completes
-            ReportingUtils.logMessage("DIAG: Stats computation complete - calling submitResult");
-
             synchronized (StatsComputeQueue.this) {
                submitResult(sequenceNumber, priority, result);
 
@@ -304,10 +297,6 @@ public final class StatsComputeQueue {
 
    private synchronized void submitResult(long sequenceNumber,
                                           final int priority, final ImagesAndStats result) {
-      // Diagnostic: Track submitResult calls
-      ReportingUtils.logMessage("DIAG: submitResult ENTRY - seqNum=" + sequenceNumber
-            + ", lastSeq=" + lastResultSequenceNumber_ + ", priority=" + priority);
-
       if (sequenceNumber < lastResultSequenceNumber_ && result.isRealStats()) {
          // Prevent late-arriving stats from causing animation to retrogress.
          // If this result contains new stats, it will still be applied to the
@@ -315,7 +304,6 @@ public final class StatsComputeQueue {
          if (perfMon_ != null) {
             perfMon_.sampleTimeInterval("Compute result discarded (retro seq nr)");
          }
-         ReportingUtils.logMessage("DIAG: submitResult - DISCARDED (retro seq nr)");
          return;
       } else if (sequenceNumber <= lastResultSequenceNumber_ && !result.isRealStats()) {
          // In the event that the bypasses images arrive after
@@ -323,7 +311,6 @@ public final class StatsComputeQueue {
          if (perfMon_ != null) {
             perfMon_.sampleTimeInterval("Compute bypass discarded (retro seq nr)");
          }
-         ReportingUtils.logMessage("DIAG: submitResult - DISCARDED (bypass retro seq nr)");
          return;
       } else {
          lastResultSequenceNumber_ = sequenceNumber;
@@ -342,12 +329,9 @@ public final class StatsComputeQueue {
                   resultFutures_.get(priority).size());
          }
          if (buffer.size() == RESULT_BUFFER_SIZE) { // full, discard oldest
-            ReportingUtils.logMessage("DIAG: submitResult - buffer full, canceling oldest task");
             buffer.removeFirst().cancel(false);
          }
       }
-
-      ReportingUtils.logMessage("DIAG: submitResult - submitting result task to resultExecutor_");
 
       resultFutures_.get(priority).addLast(resultExecutor_.submit(new Runnable() {
          @Override
@@ -356,10 +340,6 @@ public final class StatsComputeQueue {
             synchronized (StatsComputeQueue.this) {
                waitNs = nextStatsReadyCallAllowedNs_ - System.nanoTime();
             }
-
-            // Diagnostic: Log wait time before calling imageStatsReady
-            ReportingUtils.logMessage("DIAG: StatsComputeQueue - waiting "
-                  + TimeUnit.NANOSECONDS.toMillis(Math.max(0, waitNs)) + "ms before imageStatsReady");
 
             if (perfMon_ != null) {
                perfMon_.sample("Compute result pre-wait (ms)", Math.max(0, waitNs / 1000000));
@@ -373,11 +353,6 @@ public final class StatsComputeQueue {
 
             synchronized (StatsComputeQueue.this) {
                long intervalNs = listeners_.fire().imageStatsReady(result);
-
-               // Diagnostic: Log interval returned from imageStatsReady
-               ReportingUtils.logMessage("DIAG: StatsComputeQueue - received throttle interval = "
-                     + TimeUnit.NANOSECONDS.toMillis(intervalNs) + "ms");
-
                nextStatsReadyCallAllowedNs_ = System.nanoTime() + intervalNs;
             }
          }

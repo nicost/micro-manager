@@ -58,7 +58,6 @@ public class CoalescentEDTRunnablePool {
     */
    public void invokeLaterWithCoalescence(CoalescentRunnable runnable) {
       final Class<?> coalescenceClass = runnable.getCoalescenceClass();
-      boolean wasCoalesced;
       synchronized (this) {
          // Clean up stale entries that have been waiting > 5 seconds
          cleanStaleEntries();
@@ -67,36 +66,24 @@ public class CoalescentEDTRunnablePool {
                coalescedRunnables_.get(coalescenceClass);
          if (coalesced != null) {
             coalesced = coalesced.coalesceWith(runnable);
-            wasCoalesced = true;
          } else {
             coalesced = runnable;
-            wasCoalesced = false;
          }
          coalescedRunnables_.put(coalescenceClass, coalesced);
          coalescedTimestamps_.put(coalescenceClass, System.nanoTime());
       }
 
-      // Diagnostic: Track invokeLater calls
-      ReportingUtils.logMessage("DIAG: CoalescentEDTRunnablePool.invokeLater - "
-            + "coalesced=" + wasCoalesced + ", class=" + coalescenceClass.getSimpleName());
-
       SwingUtilities.invokeLater(() -> {
-         // Diagnostic: Track EDT execution
-         ReportingUtils.logMessage("DIAG: CoalescentEDTRunnablePool EDT lambda ENTRY");
-
          final CoalescentRunnable coalesced;
          synchronized (CoalescentEDTRunnablePool.this) {
             coalesced = coalescedRunnables_.remove(coalescenceClass);
             coalescedTimestamps_.remove(coalescenceClass);
          }
          if (coalesced == null) {
-            ReportingUtils.logMessage("DIAG: CoalescentEDTRunnablePool - coalesced is NULL, returning");
             return; // Already handled by previous invocations
          }
 
-         ReportingUtils.logMessage("DIAG: CoalescentEDTRunnablePool - calling coalesced.run()");
          coalesced.run();
-         ReportingUtils.logMessage("DIAG: CoalescentEDTRunnablePool - coalesced.run() completed");
       });
    }
 
