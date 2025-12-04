@@ -138,6 +138,9 @@ public final class StatsComputeQueue {
       int priority = request.getNumberOfImages();
       Coords requestCoords = request.getNominalCoords();
 
+      ReportingUtils.logMessage("DIAG: submitRequest ENTRY - seqNum=" + sequenceNumber
+            + ", coords=" + requestCoords + ", updateIntervalNs=" + updateIntervalNs_);
+
       // Don't throttle here - let bypass mechanism and display throttling handle frame rate.
       // Previously throttled at 33ms which caused old images to be processed instead of new ones
       // during high-speed acquisition, making display appear frozen.
