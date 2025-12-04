@@ -341,6 +341,9 @@ public final class StatsComputeQueue {
                waitNs = nextStatsReadyCallAllowedNs_ - System.nanoTime();
             }
 
+            ReportingUtils.logMessage("DIAG: StatsComputeQueue result task - waiting "
+                  + (Math.max(0, waitNs) / 1_000_000) + "ms before calling imageStatsReady");
+
             if (perfMon_ != null) {
                perfMon_.sample("Compute result pre-wait (ms)", Math.max(0, waitNs / 1000000));
             }
@@ -351,8 +354,12 @@ public final class StatsComputeQueue {
             } catch (InterruptedException unexpected) {
             }
 
+            ReportingUtils.logMessage("DIAG: StatsComputeQueue result task - calling imageStatsReady NOW");
+
             synchronized (StatsComputeQueue.this) {
                long intervalNs = listeners_.fire().imageStatsReady(result);
+               ReportingUtils.logMessage("DIAG: StatsComputeQueue result task - imageStatsReady returned, next allowed in "
+                     + (intervalNs / 1_000_000) + "ms");
                nextStatsReadyCallAllowedNs_ = System.nanoTime() + intervalNs;
             }
          }
