@@ -793,11 +793,12 @@ public final class DisplayController extends DisplayWindowAPIAdapter
 
       ReportingUtils.logMessage("DIAG: handleDisplayPosition - about to check for missing images, current count=" + images.size());
 
-      // CRITICAL FIX: Skip image filling during live acquisition to avoid lock contention
+      // CRITICAL FIX: Skip image filling during HIGH-SPEED acquisition to avoid lock contention
       // The condition check calls dataProvider_.getNextIndex() which can block on locks
-      // held by the acquisition thread writing images at high speed (250 FPS).
-      // During live acquisition, it's better to display whatever images we have rather
+      // held by the acquisition thread writing images at very high speed (>30 FPS).
+      // During high-speed acquisition, it's better to display whatever images we have rather
       // than block waiting for locks to check for missing images.
+      // At slower speeds (<30 FPS), the image filling loop is safe and useful.
       boolean isLiveAcquisition = false;
       try {
          isLiveAcquisition = studio_.acquisitions().isAcquisitionRunning();
@@ -805,14 +806,18 @@ public final class DisplayController extends DisplayWindowAPIAdapter
          ReportingUtils.logMessage("DIAG: handleDisplayPosition - exception checking isAcquisitionRunning: " + e);
       }
 
-      if (isLiveAcquisition && images.size() > 0) {
-         ReportingUtils.logMessage("DIAG: handleDisplayPosition - SKIPPING image filling loop (live acquisition with " + images.size() + " images)");
+      boolean isHighSpeedAcquisition = isLiveAcquisition && estimatedCameraFps_ > HIGH_SPEED_THRESHOLD_FPS;
+
+      if (isHighSpeedAcquisition && images.size() > 0) {
+         ReportingUtils.logMessage("DIAG: handleDisplayPosition - SKIPPING image filling loop (high-speed acquisition at "
+               + String.format("%.1f", estimatedCameraFps_) + " FPS with " + images.size() + " images)");
       } else {
          try {
             if (images.size() != dataProvider_.getNextIndex(Coords.CHANNEL)
                     && (!isLiveAcquisition
                     || position.getT() < dataProvider_.getNextIndex(Coords.T) - 1)) {
-               ReportingUtils.logMessage("DIAG: handleDisplayPosition - ENTERING image filling loop");
+               ReportingUtils.logMessage("DIAG: handleDisplayPosition - ENTERING image filling loop "
+                     + "(acquiring=" + isLiveAcquisition + ", fps=" + String.format("%.1f", estimatedCameraFps_) + ")");
 
                for (int c = 0; c < dataProvider_.getNextIndex(Coords.CHANNEL); c++) {
                   Coords.CoordsBuilder cb = position.copyBuilder();
