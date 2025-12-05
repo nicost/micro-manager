@@ -176,6 +176,13 @@ public final class DisplayController extends DisplayWindowAPIAdapter
    private PerformanceMonitor perfMon_
          = PerformanceMonitor.createWithTimeConstantMs(1000.0);
 
+   // Single-threaded executor for display position updates to prevent blocking
+   // AnimationController's scheduler thread with disk I/O operations
+   private final java.util.concurrent.ExecutorService displayPositionExecutor_ =
+         java.util.concurrent.Executors.newSingleThreadExecutor(
+               org.micromanager.internal.utils.ThreadFactoryFactory
+                     .createThreadFactory("Display Position Processor"));
+
 
    //This static counter makes sure that each object has it's own unique id during runtime.
    private static final AtomicInteger counter = new AtomicInteger();
@@ -856,18 +863,29 @@ public final class DisplayController extends DisplayWindowAPIAdapter
          perfMon_.sampleTimeInterval("Coords from animation controller");
       }
 
-      // We do not skip handling this position even if it equals the current
-      // position, because the image data may have changed (e.g. if we have
-      // been displaying a position that didn't yet have an image, or if this
-      // is a special datastore such as the one used for snap/live preview).
+      // CRITICAL: This callback runs on AnimationController's scheduler thread.
+      // We must NOT do blocking I/O here (like reading images from disk in handleDisplayPosition)
+      // because that would block the scheduler thread and freeze the entire animation pipeline.
+      //
+      // Instead, we submit the work to a separate executor to keep the scheduler responsive.
+      // Use a single-threaded executor to maintain ordering of position updates.
 
-      // Also, we do not throttle the processing rate here because that is done
-      // automatically by the compute queue based on result retrieval.
+      final Coords positionToDisplay = position;
+      displayPositionExecutor_.submit(() -> {
+         ReportingUtils.logMessage("DIAG: animationShouldDisplayDataPosition - calling setDisplayPosition on executor");
 
-      // Set the "official" position of this data viewer
-      ReportingUtils.logMessage("DIAG: animationShouldDisplayDataPosition - calling setDisplayPosition");
-      setDisplayPosition(position, true);
-      ReportingUtils.logMessage("DIAG: animationShouldDisplayDataPosition EXIT");
+         // We do not skip handling this position even if it equals the current
+         // position, because the image data may have changed (e.g. if we have
+         // been displaying a position that didn't yet have an image, or if this
+         // is a special datastore such as the one used for snap/live preview).
+
+         // Also, we do not throttle the processing rate here because that is done
+         // automatically by the compute queue based on result retrieval.
+
+         // Set the "official" position of this data viewer
+         setDisplayPosition(positionToDisplay, true);
+         ReportingUtils.logMessage("DIAG: animationShouldDisplayDataPosition EXIT");
+      });
    }
 
    @Override
@@ -1354,6 +1372,15 @@ public final class DisplayController extends DisplayWindowAPIAdapter
             computeQueue_.shutdown();
          } catch (InterruptedException ie) {
             // TODO: report exception
+         }
+         displayPositionExecutor_.shutdown();
+         try {
+            if (!displayPositionExecutor_.awaitTermination(2, java.util.concurrent.TimeUnit.SECONDS)) {
+               displayPositionExecutor_.shutdownNow();
+            }
+         } catch (InterruptedException ie) {
+            displayPositionExecutor_.shutdownNow();
+            Thread.currentThread().interrupt();
          }
          perfMon_ = null;
          animationController_.shutdown();
