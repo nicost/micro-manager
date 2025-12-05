@@ -183,6 +183,14 @@ public final class DisplayController extends DisplayWindowAPIAdapter
                org.micromanager.internal.utils.ThreadFactoryFactory
                      .createThreadFactory("Display Position Processor"));
 
+   // Track pending display position for coalescence - only process latest position
+   private final java.util.concurrent.atomic.AtomicReference<Coords> pendingDisplayPosition_ =
+         new java.util.concurrent.atomic.AtomicReference<>(null);
+
+   // Track if display position processor is currently running
+   private final java.util.concurrent.atomic.AtomicBoolean displayPositionProcessing_ =
+         new java.util.concurrent.atomic.AtomicBoolean(false);
+
 
    //This static counter makes sure that each object has it's own unique id during runtime.
    private static final AtomicInteger counter = new AtomicInteger();
@@ -867,25 +875,73 @@ public final class DisplayController extends DisplayWindowAPIAdapter
       // We must NOT do blocking I/O here (like reading images from disk in handleDisplayPosition)
       // because that would block the scheduler thread and freeze the entire animation pipeline.
       //
-      // Instead, we submit the work to a separate executor to keep the scheduler responsive.
-      // Use a single-threaded executor to maintain ordering of position updates.
+      // We use coalescence to ensure only the LATEST position is processed, skipping
+      // intermediate positions when disk I/O is slower than the update rate.
 
-      final Coords positionToDisplay = position;
-      displayPositionExecutor_.submit(() -> {
-         ReportingUtils.logMessage("DIAG: animationShouldDisplayDataPosition - calling setDisplayPosition on executor");
+      // Store the latest position (coalescence - overwrites any pending position)
+      pendingDisplayPosition_.set(position);
 
-         // We do not skip handling this position even if it equals the current
-         // position, because the image data may have changed (e.g. if we have
-         // been displaying a position that didn't yet have an image, or if this
-         // is a special datastore such as the one used for snap/live preview).
+      // If not already processing, start the processing loop
+      if (displayPositionProcessing_.compareAndSet(false, true)) {
+         displayPositionExecutor_.submit(() -> {
+            try {
+               // Process positions in a loop until no more pending
+               while (true) {
+                  // Get and clear the pending position atomically
+                  Coords positionToDisplay = pendingDisplayPosition_.getAndSet(null);
+                  if (positionToDisplay == null) {
+                     break; // No more pending positions
+                  }
 
-         // Also, we do not throttle the processing rate here because that is done
-         // automatically by the compute queue based on result retrieval.
+                  ReportingUtils.logMessage("DIAG: Processing display position on executor - coords=" + positionToDisplay);
 
-         // Set the "official" position of this data viewer
-         setDisplayPosition(positionToDisplay, true);
-         ReportingUtils.logMessage("DIAG: animationShouldDisplayDataPosition EXIT");
-      });
+                  // We do not skip handling this position even if it equals the current
+                  // position, because the image data may have changed (e.g. if we have
+                  // been displaying a position that didn't yet have an image, or if this
+                  // is a special datastore such as the one used for snap/live preview).
+
+                  // Set the "official" position of this data viewer
+                  setDisplayPosition(positionToDisplay, true);
+                  ReportingUtils.logMessage("DIAG: Finished processing display position - coords=" + positionToDisplay);
+               }
+            } finally {
+               // Mark as not processing
+               displayPositionProcessing_.set(false);
+
+               // Check if a new position arrived while we were marking as not processing
+               if (pendingDisplayPosition_.get() != null) {
+                  // Restart processing if needed
+                  if (displayPositionProcessing_.compareAndSet(false, true)) {
+                     displayPositionExecutor_.submit(this::processDisplayPositions);
+                  }
+               }
+            }
+         });
+      } else {
+         ReportingUtils.logMessage("DIAG: Skipping - already processing, position will be coalesced");
+      }
+   }
+
+   private void processDisplayPositions() {
+      // This is a workaround to allow recursive submission - see finally block above
+      try {
+         while (true) {
+            Coords positionToDisplay = pendingDisplayPosition_.getAndSet(null);
+            if (positionToDisplay == null) {
+               break;
+            }
+            ReportingUtils.logMessage("DIAG: Processing display position on executor - coords=" + positionToDisplay);
+            setDisplayPosition(positionToDisplay, true);
+            ReportingUtils.logMessage("DIAG: Finished processing display position - coords=" + positionToDisplay);
+         }
+      } finally {
+         displayPositionProcessing_.set(false);
+         if (pendingDisplayPosition_.get() != null) {
+            if (displayPositionProcessing_.compareAndSet(false, true)) {
+               displayPositionExecutor_.submit(this::processDisplayPositions);
+            }
+         }
+      }
    }
 
    @Override
