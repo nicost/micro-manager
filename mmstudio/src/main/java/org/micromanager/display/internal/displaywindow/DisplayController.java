@@ -792,11 +792,27 @@ public final class DisplayController extends DisplayWindowAPIAdapter
       // During acquisition, do not search in Z if newest timepoint.
 
       ReportingUtils.logMessage("DIAG: handleDisplayPosition - about to check for missing images, current count=" + images.size());
+
+      // CRITICAL FIX: Skip image filling during live acquisition to avoid lock contention
+      // The condition check calls dataProvider_.getNextIndex() which can block on locks
+      // held by the acquisition thread writing images at high speed (250 FPS).
+      // During live acquisition, it's better to display whatever images we have rather
+      // than block waiting for locks to check for missing images.
+      boolean isLiveAcquisition = false;
       try {
-         if (images.size() != dataProvider_.getNextIndex(Coords.CHANNEL)
-               && (!studio_.acquisitions().isAcquisitionRunning()
-               || position.getT() < dataProvider_.getNextIndex(Coords.T) - 1)) {
-            ReportingUtils.logMessage("DIAG: handleDisplayPosition - ENTERING image filling loop");
+         isLiveAcquisition = studio_.acquisitions().isAcquisitionRunning();
+      } catch (Exception e) {
+         ReportingUtils.logMessage("DIAG: handleDisplayPosition - exception checking isAcquisitionRunning: " + e);
+      }
+
+      if (isLiveAcquisition && images.size() > 0) {
+         ReportingUtils.logMessage("DIAG: handleDisplayPosition - SKIPPING image filling loop (live acquisition with " + images.size() + " images)");
+      } else {
+         try {
+            if (images.size() != dataProvider_.getNextIndex(Coords.CHANNEL)
+                  && (!isLiveAcquisition
+                  || position.getT() < dataProvider_.getNextIndex(Coords.T) - 1)) {
+               ReportingUtils.logMessage("DIAG: handleDisplayPosition - ENTERING image filling loop");
 
             for (int c = 0; c < dataProvider_.getNextIndex(Coords.CHANNEL); c++) {
                Coords.CoordsBuilder cb = position.copyBuilder();
