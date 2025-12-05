@@ -810,50 +810,51 @@ public final class DisplayController extends DisplayWindowAPIAdapter
       } else {
          try {
             if (images.size() != dataProvider_.getNextIndex(Coords.CHANNEL)
-                  && (!isLiveAcquisition
-                  || position.getT() < dataProvider_.getNextIndex(Coords.T) - 1)) {
+                    && (!isLiveAcquisition
+                    || position.getT() < dataProvider_.getNextIndex(Coords.T) - 1)) {
                ReportingUtils.logMessage("DIAG: handleDisplayPosition - ENTERING image filling loop");
 
-            for (int c = 0; c < dataProvider_.getNextIndex(Coords.CHANNEL); c++) {
-               Coords.CoordsBuilder cb = position.copyBuilder();
-               Coords targetCoord = cb.channel(c).build();
-               CHANNEL_SEARCH:
-               if (!dataProvider_.hasImage(targetCoord)) {
-                  // c is missing, first look in z
-                  int zOffset = 1;
-                  while (position.getZ() - zOffset > -1
-                        || position.getZ() + zOffset <= dataProvider_.getNextIndex(Coords.Z)) {
-                     Coords testPosition = cb.z(position.getZ() - zOffset).build();
-                     if (dataProvider_.hasImage(testPosition)) {
-                        images.add(dataProvider_.getImage(testPosition).copyAtCoords(targetCoord));
-                        break CHANNEL_SEARCH;
+               for (int c = 0; c < dataProvider_.getNextIndex(Coords.CHANNEL); c++) {
+                  Coords.CoordsBuilder cb = position.copyBuilder();
+                  Coords targetCoord = cb.channel(c).build();
+                  CHANNEL_SEARCH:
+                  if (!dataProvider_.hasImage(targetCoord)) {
+                     // c is missing, first look in z
+                     int zOffset = 1;
+                     while (position.getZ() - zOffset > -1
+                             || position.getZ() + zOffset <= dataProvider_.getNextIndex(Coords.Z)) {
+                        Coords testPosition = cb.z(position.getZ() - zOffset).build();
+                        if (dataProvider_.hasImage(testPosition)) {
+                           images.add(dataProvider_.getImage(testPosition).copyAtCoords(targetCoord));
+                           break CHANNEL_SEARCH;
+                        }
+                        testPosition = cb.z(position.getZ() + zOffset).build();
+                        if (dataProvider_.hasImage(testPosition)) {
+                           images.add(dataProvider_.getImage(testPosition).copyAtCoords(targetCoord));
+                           break CHANNEL_SEARCH;
+                        }
+                        zOffset++;
                      }
-                     testPosition = cb.z(position.getZ() + zOffset).build();
-                     if (dataProvider_.hasImage(testPosition)) {
-                        images.add(dataProvider_.getImage(testPosition).copyAtCoords(targetCoord));
-                        break CHANNEL_SEARCH;
-                     }
-                     zOffset++;
-                  }
-                  // not found in z, now look backwards in time
-                  cb = targetCoord.copyBuilder();
-                  for (int t = position.getT(); t > -1; t--) {
-                     Coords testPosition = cb.time(t).build();
-                     if (dataProvider_.hasImage(testPosition)) {
-                        images.add(dataProvider_.getImage(testPosition).copyAtCoords(targetCoord));
-                        break;
+                     // not found in z, now look backwards in time
+                     cb = targetCoord.copyBuilder();
+                     for (int t = position.getT(); t > -1; t--) {
+                        Coords testPosition = cb.time(t).build();
+                        if (dataProvider_.hasImage(testPosition)) {
+                           images.add(dataProvider_.getImage(testPosition).copyAtCoords(targetCoord));
+                           break;
+                        }
                      }
                   }
                }
+               ReportingUtils.logMessage("DIAG: handleDisplayPosition - EXITED image filling loop");
+            } else {
+               ReportingUtils.logMessage("DIAG: handleDisplayPosition - SKIPPING image filling loop (all images present or acquisition running on latest timepoint)");
             }
-            ReportingUtils.logMessage("DIAG: handleDisplayPosition - EXITED image filling loop");
-         } else {
-            ReportingUtils.logMessage("DIAG: handleDisplayPosition - SKIPPING image filling loop (all images present or acquisition running on latest timepoint)");
+         } catch (IOException e) {
+            ReportingUtils.logMessage("DIAG: handleDisplayPosition - image filling loop threw IOException: " + e);
+            // TODO Should display error
+            images = Collections.emptyList();
          }
-      } catch (IOException e) {
-         ReportingUtils.logMessage("DIAG: handleDisplayPosition - image filling loop threw IOException: " + e);
-         // TODO Should display error
-         images = Collections.emptyList();
       }
 
       ReportingUtils.logMessage("DIAG: handleDisplayPosition - finished handling missing images, final count=" + images.size());
@@ -863,9 +864,8 @@ public final class DisplayController extends DisplayWindowAPIAdapter
       // is finite).
       if (images.size() > 1) {
          images.sort((Image o1, Image o2) ->
-               Integer.compare(o1.getCoords().getChannel(), o2.getCoords().getChannel()));
+                  Integer.compare(o1.getCoords().getChannel(), o2.getCoords().getChannel()));
       }
-
 
       BoundsRectAndMask selection = BoundsRectAndMask.unselected();
       if (getDisplaySettings().isROIAutoscaleEnabled()) {
@@ -890,7 +890,6 @@ public final class DisplayController extends DisplayWindowAPIAdapter
    //
    // Implementation of AnimationController.Listener<Coords>
    //
-
    @Override
    public void animationShouldDisplayDataPosition(Coords position) {
       ReportingUtils.logMessage("DIAG: animationShouldDisplayDataPosition ENTRY - coords=" + position);
