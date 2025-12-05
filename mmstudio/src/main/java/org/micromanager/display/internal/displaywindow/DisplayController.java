@@ -760,11 +760,14 @@ public final class DisplayController extends DisplayWindowAPIAdapter
 
       // Always compute stats for all channels
       List<Image> images;
+      ReportingUtils.logMessage("DIAG: handleDisplayPosition - about to call getImagesIgnoringAxes for " + position);
       try {
          images = dataProvider_.getImagesIgnoringAxes(
                position.copyRemovingAxes(Coords.CHANNEL),
                Coords.CHANNEL);
+         ReportingUtils.logMessage("DIAG: handleDisplayPosition - getImagesIgnoringAxes returned " + images.size() + " images");
       } catch (IOException e) {
+         ReportingUtils.logMessage("DIAG: handleDisplayPosition - getImagesIgnoringAxes threw IOException: " + e);
          // TODO Should display error
          images = Collections.emptyList();
       }
@@ -788,10 +791,12 @@ public final class DisplayController extends DisplayWindowAPIAdapter
       // During acquisition, do not search back in time if newest timepoint.
       // During acquisition, do not search in Z if newest timepoint.
 
+      ReportingUtils.logMessage("DIAG: handleDisplayPosition - about to check for missing images, current count=" + images.size());
       try {
          if (images.size() != dataProvider_.getNextIndex(Coords.CHANNEL)
                && (!studio_.acquisitions().isAcquisitionRunning()
                || position.getT() < dataProvider_.getNextIndex(Coords.T) - 1)) {
+            ReportingUtils.logMessage("DIAG: handleDisplayPosition - ENTERING image filling loop");
 
             for (int c = 0; c < dataProvider_.getNextIndex(Coords.CHANNEL); c++) {
                Coords.CoordsBuilder cb = position.copyBuilder();
@@ -825,11 +830,17 @@ public final class DisplayController extends DisplayWindowAPIAdapter
                   }
                }
             }
+            ReportingUtils.logMessage("DIAG: handleDisplayPosition - EXITED image filling loop");
+         } else {
+            ReportingUtils.logMessage("DIAG: handleDisplayPosition - SKIPPING image filling loop (all images present or acquisition running on latest timepoint)");
          }
       } catch (IOException e) {
+         ReportingUtils.logMessage("DIAG: handleDisplayPosition - image filling loop threw IOException: " + e);
          // TODO Should display error
          images = Collections.emptyList();
       }
+
+      ReportingUtils.logMessage("DIAG: handleDisplayPosition - finished handling missing images, final count=" + images.size());
 
       // Images are sorted by channel here, since we don't (yet) have any other
       // way to correctly recombine stats with newer images (when update rate
