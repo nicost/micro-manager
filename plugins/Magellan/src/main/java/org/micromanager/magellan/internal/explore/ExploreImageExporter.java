@@ -39,15 +39,29 @@ public class ExploreImageExporter {
     * @param resLevel      Resolution level (0 = full res, 1 = half res, …).
     * @param format        "TIFF", "JPEG", "PNG", or "GIF".
     * @param outputPath    Destination file path (extension appended if absent).
+    * @param blend         When true, use feathered blending in tile overlap zones.
     */
    public void export(HashMap<String, Object> baseAxes, List<String> channelNames,
                       int roiX, int roiY, int roiW, int roiH,
-                      int resLevel, String format, String outputPath) throws Exception {
+                      int resLevel, String format, String outputPath,
+                      boolean blend) throws Exception {
       int scale = 1 << resLevel;
       int dsX = roiX / scale;
       int dsY = roiY / scale;
       int dsW = Math.max(1, roiW / scale);
       int dsH = Math.max(1, roiH / scale);
+
+      // Blending path: use TileBlender when overlap data is available
+      if (blend) {
+         JSONObject summaryMD = storage_.getSummaryMetadata();
+         if (summaryMD != null) {
+            BufferedImage blended = new TileBlender(storage_, displaySettings_,
+                    baseAxes, channelNames, summaryMD)
+                    .composite(roiX, roiY, roiW, roiH, resLevel);
+            writeImage(blended, format, outputPath);
+            return;
+         }
+      }
 
       // NDViewer stores per-channel settings as top-level keys in the display settings
       // JSON, where each key is the channel name and the value is a JSONObject with

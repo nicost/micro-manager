@@ -267,6 +267,8 @@ public class MagellanAcqUIAndStorage
             exploreControlsPanel_ = new ExploreControlsPanel((ExploreAcquisition) acq_,
                     overlayer_, useZ_, exploreChannels_, acq_.getZAxes());
             display_.addControlPanel(exploreControlsPanel_);
+         }
+         if (acq_ instanceof ExploreAcquisition || loadedData_) {
             exportControlsPanel_ = new ExportControlsPanel(this::startExportMode);
             display_.addControlPanel(exportControlsPanel_);
          }
@@ -560,7 +562,7 @@ public class MagellanAcqUIAndStorage
          try {
             new ExploreImageExporter(storage_, displaySettings)
                     .export(baseAxes, channels, x1f, y1f, roiWf, roiHf,
-                            opts.resolutionLevel, opts.format, opts.filePath);
+                            opts.resolutionLevel, opts.format, opts.filePath, opts.blend);
             SwingUtilities.invokeLater(() ->
                     JOptionPane.showMessageDialog(null,
                             "Export complete:\n" + opts.filePath));

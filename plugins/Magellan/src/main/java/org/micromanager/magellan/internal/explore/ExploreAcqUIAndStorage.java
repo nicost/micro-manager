@@ -683,7 +683,7 @@ public class ExploreAcqUIAndStorage implements AcqEngJDataSink, NDViewerDataSour
          try {
             new ExploreImageExporter(storage_, displaySettings)
                     .export(baseAxes, channels, x1f, y1f, roiWf, roiHf,
-                            opts.resolutionLevel, opts.format, opts.filePath);
+                            opts.resolutionLevel, opts.format, opts.filePath, opts.blend);
             SwingUtilities.invokeLater(() ->
                     JOptionPane.showMessageDialog(null,
                             "Export complete:\n" + opts.filePath));
