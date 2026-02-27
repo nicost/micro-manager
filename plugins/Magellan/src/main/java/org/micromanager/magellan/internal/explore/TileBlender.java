@@ -63,18 +63,6 @@ public class TileBlender {
     * @return 8-bit RGB BufferedImage with blended tile seams.
     */
    public BufferedImage composite(int roiX, int roiY, int roiW, int roiH, int resLevel) {
-      System.out.println("[TileBlender] composite called: roi=(" + roiX + "," + roiY + " "
-              + roiW + "x" + roiH + ") resLevel=" + resLevel
-              + " tileSize=" + tileWidth_ + "x" + tileHeight_
-              + " overlap=" + overlapX_ + "x" + overlapY_);
-      System.out.println("[TileBlender] baseAxes=" + baseAxes_);
-      System.out.println("[TileBlender] channelNames=" + channelNames_);
-      Set<HashMap<String, Object>> allAxes = storage_.getAxesSet();
-      System.out.println("[TileBlender] storage axesSet size=" + allAxes.size());
-      if (!allAxes.isEmpty()) {
-         System.out.println("[TileBlender] first stored axes=" + allAxes.iterator().next());
-      }
-
       int scale = 1 << resLevel;
       int dsRoiX = roiX / scale;
       int dsRoiY = roiY / scale;
@@ -107,18 +95,13 @@ public class TileBlender {
       // Determine tile row/col range that covers the ROI.
       // Tile indices are signed (negative rows/cols are valid in explore acquisitions).
       // Use floor division so negative coordinates round toward -infinity.
-      int colMin = dsStepX > 0 ? floorDiv(dsRoiX, dsStepX) : 0;
-      int rowMin = dsStepY > 0 ? floorDiv(dsRoiY, dsStepY) : 0;
-      int colMax = dsStepX > 0 ? floorDiv(dsRoiX + dsRoiW - 1, dsStepX) : 0;
-      int rowMax = dsStepY > 0 ? floorDiv(dsRoiY + dsRoiH - 1, dsStepY) : 0;
+      int colMin = dsStepX > 0 ? Math.floorDiv(dsRoiX, dsStepX) : 0;
+      int rowMin = dsStepY > 0 ? Math.floorDiv(dsRoiY, dsStepY) : 0;
+      int colMax = dsStepX > 0 ? Math.floorDiv(dsRoiX + dsRoiW - 1, dsStepX) : 0;
+      int rowMax = dsStepY > 0 ? Math.floorDiv(dsRoiY + dsRoiH - 1, dsStepY) : 0;
 
       // Get the set of tiles that actually have data at the current z position
       Set<Point> tilesWithData = getTilesWithData();
-      System.out.println("[TileBlender] tilesWithData=" + tilesWithData);
-      System.out.println("[TileBlender] tile range row=" + rowMin + ".." + rowMax
-              + " col=" + colMin + ".." + colMax);
-      System.out.println("[TileBlender] dsStep=" + dsStepX + "x" + dsStepY
-              + " dsTile=" + dsTileW + "x" + dsTileH);
 
       int numChannels = channelNames_.size();
 
@@ -187,20 +170,13 @@ public class TileBlender {
                // override row and column with the tile coordinates.
                HashMap<String, Object> axes = buildAxesForTile(row, col, chName);
                if (axes == null) {
-                  System.out.println("[TileBlender] buildAxesForTile returned null for row="
-                          + row + " col=" + col + " ch=" + chName);
                   continue;
                }
 
                TaggedImage taggedImage = storage_.getImage(axes, resLevel);
                if (taggedImage == null || !(taggedImage.pix instanceof short[])) {
-                  System.out.println("[TileBlender] getImage returned null/non-short for axes="
-                          + axes + " resLevel=" + resLevel
-                          + " pix=" + (taggedImage == null ? "null" : taggedImage.pix));
                   continue;
                }
-               System.out.println("[TileBlender] got tile row=" + row + " col=" + col
-                       + " ch=" + chName + " pixels=" + ((short[]) taggedImage.pix).length);
                short[] tilePix = (short[]) taggedImage.pix;
 
                for (int py = interY0; py < interY1; py++) {
@@ -240,10 +216,6 @@ public class TileBlender {
          out.setRGB(i % dsRoiW, i / dsRoiW, (r << 16) | (g << 8) | b);
       }
       return out;
-   }
-
-   private static int floorDiv(int a, int b) {
-      return Math.floorDiv(a, b);
    }
 
    /**
