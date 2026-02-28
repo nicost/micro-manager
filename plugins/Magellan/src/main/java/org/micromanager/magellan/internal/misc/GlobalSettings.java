@@ -17,6 +17,7 @@
 
 package org.micromanager.magellan.internal.misc;
 
+import java.util.prefs.Preferences;
 import javax.swing.filechooser.FileSystemView;
 import org.micromanager.UserProfile;
 import org.micromanager.magellan.internal.main.Magellan;
@@ -30,7 +31,10 @@ public class GlobalSettings {
 
    private static final String SAVING_DIR = "SAVING DIRECTORY";
    private static final String CHANNEL_OFFSET_PREFIX = "CHANNEL_OFFSET_";
-   
+
+   private static final Preferences JAVA_PREFS =
+           Preferences.userNodeForPackage(GlobalSettings.class);
+
    MutablePropertyMapView prefs_;
    private int[] chOffsets_ = new int[8];
 
@@ -56,11 +60,11 @@ public class GlobalSettings {
    }
 
    public void storeSavingDirectory(String dir) {
-      prefs_.putString(SAVING_DIR, dir);
+      JAVA_PREFS.put(SAVING_DIR, dir);
    }
-   
+
    public String getStoredSavingDirectory() {
-      return prefs_.getString(SAVING_DIR, FileSystemView.getFileSystemView()
+      return JAVA_PREFS.get(SAVING_DIR, FileSystemView.getFileSystemView()
             .getHomeDirectory().getAbsolutePath());
    }
 
