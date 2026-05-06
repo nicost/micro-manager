@@ -34,23 +34,37 @@ import com.jogamp.newt.awt.NewtCanvasAWT;
 import coremem.enums.NativeTypeEnum;
 import coremem.fragmented.FragmentedMemory;
 import edu.ucsf.valelab.mmclearvolumeplugin.events.CanvasDrawCompleteEvent;
+import java.awt.AlphaComposite;
 import java.awt.BorderLayout;
 import java.awt.Color;
-import java.awt.Container;
 import java.awt.Dimension;
+import java.awt.Graphics;
+import java.awt.Graphics2D;
+import java.awt.Rectangle;
 import java.awt.Toolkit;
+import java.awt.event.MouseEvent;
+import java.awt.event.MouseListener;
+import java.awt.event.MouseMotionListener;
+import java.awt.event.MouseWheelEvent;
+import java.awt.event.MouseWheelListener;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.awt.event.WindowFocusListener;
+import java.awt.geom.Rectangle2D;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ShortBuffer;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.TimeUnit;
 import javax.swing.JFrame;
+import javax.swing.JLayeredPane;
+import javax.swing.JPanel;
 import javax.swing.SwingUtilities;
 import org.micromanager.LogManager;
 import org.micromanager.Studio;
@@ -77,11 +91,16 @@ import org.micromanager.display.internal.event.DataViewerDidBecomeInactiveEvent;
 import org.micromanager.display.internal.event.DataViewerDidBecomeVisibleEvent;
 import org.micromanager.display.internal.event.DataViewerWillCloseEvent;
 import org.micromanager.display.internal.event.DefaultDisplaySettingsChangedEvent;
+import org.micromanager.display.internal.event.DisplayWindowDidAddOverlayEvent;
+import org.micromanager.display.internal.event.DisplayWindowDidRemoveOverlayEvent;
 import org.micromanager.display.internal.imagestats.BoundsRectAndMask;
 import org.micromanager.display.internal.imagestats.ComponentStats;
 import org.micromanager.display.internal.imagestats.ImageStatsProcessor;
 import org.micromanager.display.internal.imagestats.ImageStatsRequest;
 import org.micromanager.display.internal.imagestats.ImagesAndStats;
+import org.micromanager.display.overlay.Overlay;
+import org.micromanager.display.overlay.OverlayListener;
+import org.micromanager.display.overlay.OverlaySupport;
 import org.micromanager.events.ShutdownCommencingEvent;
 import org.micromanager.internal.utils.WindowPositioning;
 
@@ -91,7 +110,7 @@ import org.micromanager.internal.utils.WindowPositioning;
  *
  * @author nico
  */
-public class CVViewer implements DataViewer, ImageStatsPublisher {
+public class CVViewer implements DataViewer, ImageStatsPublisher, OverlaySupport {
 
    private DisplaySettings displaySettings_;
    private final ImageStatsProcessor imageStatsProcessor_;
@@ -108,6 +127,12 @@ public class CVViewer implements DataViewer, ImageStatsPublisher {
    private ImagesAndStats lastCalculatedImagesAndStats_;
    private final Color[] colors = {Color.RED, Color.GREEN, Color.BLUE, Color.MAGENTA,
                                    Color.PINK, Color.CYAN, Color.YELLOW, Color.ORANGE};
+
+   // MM Inspector overlay support
+   private final List<Overlay> mmOverlays_ = new CopyOnWriteArrayList<>();
+   private final Map<Overlay, OverlayListener> mmOverlayListeners_ = new HashMap<>();
+   // Transparent panel layered on top of the NEWT canvas for painting overlays
+   private JPanel overlayPanel_;
    
    
    private class CVFrame extends JFrame {
@@ -244,12 +269,68 @@ public class CVViewer implements DataViewer, ImageStatsPublisher {
 
          cvFrame_.setTitle(name_);
          cvFrame_.setLayout(new BorderLayout());
-         final Container container = new Container();
-         container.setLayout(new BorderLayout());
-         container.add(lNCWAWT, BorderLayout.CENTER);
-         cvFrame_.setSize(new Dimension(randomImage.getWidth(),
-                 randomImage.getHeight()));
-         cvFrame_.add(container);
+
+         final int canvasW = randomImage.getWidth();
+         final int canvasH = randomImage.getHeight();
+
+         // Use JLayeredPane so a transparent Swing panel can sit above the
+         // heavyweight NEWT canvas and receive Graphics2D overlay painting.
+         final JLayeredPane layeredPane = new JLayeredPane() {
+            @Override
+            public Dimension getPreferredSize() {
+               return new Dimension(canvasW, canvasH);
+            }
+         };
+         lNCWAWT.setBounds(0, 0, canvasW, canvasH);
+         layeredPane.add(lNCWAWT, JLayeredPane.DEFAULT_LAYER);
+
+         overlayPanel_ = new JPanel() {
+            @Override
+            protected void paintComponent(Graphics g) {
+               super.paintComponent(g);
+               paintOverlays((Graphics2D) g);
+            }
+         };
+         overlayPanel_.setOpaque(false);
+         overlayPanel_.setBounds(0, 0, canvasW, canvasH);
+         // Pass mouse events through to the NEWT canvas underneath.
+         overlayPanel_.addMouseListener(new MouseListener() {
+
+            @Override public void mouseClicked(MouseEvent e) {
+               lNCWAWT.dispatchEvent(e);
+            }
+
+            @Override public void mousePressed(MouseEvent e) {
+               lNCWAWT.dispatchEvent(e);
+            }
+
+            @Override public void mouseReleased(MouseEvent e) {
+               lNCWAWT.dispatchEvent(e);
+            }
+
+            @Override public void mouseEntered(MouseEvent e) {
+               lNCWAWT.dispatchEvent(e);
+            }
+
+            @Override public void mouseExited(MouseEvent e) {
+               lNCWAWT.dispatchEvent(e);
+            }
+         });
+         overlayPanel_.addMouseMotionListener(new MouseMotionListener() {
+
+            @Override public void mouseDragged(MouseEvent e) {
+               lNCWAWT.dispatchEvent(e);
+            }
+
+            @Override public void mouseMoved(MouseEvent e) {
+               lNCWAWT.dispatchEvent(e);
+            }
+         });
+         overlayPanel_.addMouseWheelListener((MouseWheelEvent e) -> lNCWAWT.dispatchEvent(e));
+         layeredPane.add(overlayPanel_, JLayeredPane.PALETTE_LAYER);
+
+         cvFrame_.setSize(new Dimension(canvasW, canvasH));
+         cvFrame_.add(layeredPane);
 
          SwingUtilities.invokeLater(() -> {
             cvFrame_.setVisible(true);
@@ -316,7 +397,107 @@ public class CVViewer implements DataViewer, ImageStatsPublisher {
 
    }
 
+   // -----------------------------------------------------------------------
+   // OverlaySupport implementation
+   // -----------------------------------------------------------------------
+
+   private void paintOverlays(Graphics2D g2d) {
+      if (mmOverlays_.isEmpty() || displaySettings_ == null) {
+         return;
+      }
+      g2d.setComposite(AlphaComposite.SrcOver);
+      Rectangle screenRect = new Rectangle(0, 0,
+            overlayPanel_.getWidth(), overlayPanel_.getHeight());
+      // There is no 2D image-to-screen mapping for a 3D volume; use the full
+      // canvas as the viewport so overlays at least have a sensible coordinate space.
+      Rectangle2D.Float imageViewPort = new Rectangle2D.Float(
+            0, 0, overlayPanel_.getWidth(), overlayPanel_.getHeight());
+      Image primaryImage = null;
+      try {
+         if (dataProvider_ != null && lastDisplayedCoords_ != null) {
+            int midZ = dataProvider_.getNextIndex(Coords.Z) / 2;
+            primaryImage = dataProvider_.getImage(
+                  lastDisplayedCoords_.copyBuilder().z(midZ).build());
+         }
+      } catch (IOException ioe) {
+         studio_.logs().logError(ioe);
+      }
+      List<Image> images = primaryImage != null
+            ? Collections.singletonList(primaryImage) : Collections.emptyList();
+      for (Overlay overlay : mmOverlays_) {
+         if (overlay.isVisible()) {
+            try {
+               overlay.paintOverlay(g2d, screenRect, displaySettings_,
+                     images, primaryImage, imageViewPort);
+            } catch (Exception ex) {
+               studio_.logs().logError(ex, "Exception painting overlay: " + overlay.getTitle());
+            }
+         }
+      }
+   }
+
+   @Override
+   public void addOverlay(Overlay overlay) {
+      if (overlay == null) {
+         return;
+      }
+      mmOverlays_.add(overlay);
+      OverlayListener listener = new OverlayListener() {
+         @Override
+         public void overlayTitleChanged(Overlay o) {}
+
+         @Override
+         public void overlayConfigurationChanged(Overlay o) {
+            if (overlayPanel_ != null) {
+               SwingUtilities.invokeLater(() -> overlayPanel_.repaint());
+            }
+         }
+
+         @Override
+         public void overlayVisibleChanged(Overlay o) {
+            if (overlayPanel_ != null) {
+               SwingUtilities.invokeLater(() -> overlayPanel_.repaint());
+            }
+         }
+      };
+      synchronized (mmOverlayListeners_) {
+         mmOverlayListeners_.put(overlay, listener);
+      }
+      overlay.addOverlayListener(listener);
+      postEvent(DisplayWindowDidAddOverlayEvent.create(null, overlay));
+      if (overlayPanel_ != null) {
+         SwingUtilities.invokeLater(() -> overlayPanel_.repaint());
+      }
+   }
+
+   @Override
+   public void removeOverlay(Overlay overlay) {
+      if (overlay == null) {
+         return;
+      }
+      mmOverlays_.remove(overlay);
+      OverlayListener listener;
+      synchronized (mmOverlayListeners_) {
+         listener = mmOverlayListeners_.remove(overlay);
+      }
+      if (listener != null) {
+         overlay.removeOverlayListener(listener);
+      }
+      postEvent(DisplayWindowDidRemoveOverlayEvent.create(null, overlay));
+      if (overlayPanel_ != null) {
+         SwingUtilities.invokeLater(() -> overlayPanel_.repaint());
+      }
+   }
+
+   @Override
+   public List<Overlay> getOverlays() {
+      return Collections.unmodifiableList(new ArrayList<>(mmOverlays_));
+   }
+
    private void cleanup() {
+      for (Overlay overlay : new ArrayList<>(mmOverlays_)) {
+         removeOverlay(overlay);
+      }
       studio_.getDisplayManager().removeViewer(this);
       studio_.events().post(DataViewerWillCloseEvent.create(this));
       dataProvider_.unregisterForEvents(this);
@@ -1249,6 +1430,9 @@ public class CVViewer implements DataViewer, ImageStatsPublisher {
       }
       lastDisplayedCoords_ = coords;
       displayBus_.post(new CanvasDrawCompleteEvent());
+      if (overlayPanel_ != null) {
+         SwingUtilities.invokeLater(() -> overlayPanel_.repaint());
+      }
    }
 
    @Override
