@@ -104,6 +104,7 @@ public class MultiAcqEngJAdapter extends AcqEngJAdapter {
    private boolean autofocusOn_;
 
    private long nextWakeTime_ = -1;
+   private long lastFrameIndex_ = -1;
 
    private ArrayList<RunnablePlusIndices> runnables_ = new ArrayList<>();
 
@@ -287,6 +288,15 @@ public class MultiAcqEngJAdapter extends AcqEngJAdapter {
                   AcquisitionAPI.BEFORE_Z_DRIVE_HOOK);
          }
 
+         // Hook to update the time of the next wake-up call, so that the "Next frame in
+         // xxx sec" alert shows a sensible countdown. Without this, getNextWakeTime()
+         // returns its initial -1 and the alert shows a large negative number.
+         if (timeLapseSettings_.useFrames()) {
+            lastFrameIndex_ = -1;
+            currentMultiMDA_.addHook(updateNextWakeHook(timeLapseSettings_),
+                  AcquisitionAPI.AFTER_HARDWARE_HOOK);
+         }
+
          for (int i = 0; i < sequenceSettings.size(); i++) {
             // Hook to move back the ZStage to its original position after a Z stack
             if (sequenceSettings.get(i).useSlices()) {
@@ -460,6 +470,23 @@ public class MultiAcqEngJAdapter extends AcqEngJAdapter {
       Function<AcquisitionEvent, Iterator<AcquisitionEvent>> positions = null;
       if (acquisitionSettings.usePositionList()) {
          positions = MDAAcqEventModules.positions(positionList, tag, core_);
+      } else if (timeLapseSettings_.useAutofocus()) {
+         // No position list, but autofocus is on. Mirror the single-MDA path
+         // (AcqEngJAdapter.createAcqEventIterator): synthesize a single dummy position so
+         // every event carries a POS_NAME tag. Without POS_NAME, autofocusHook() cannot
+         // record the autofocused Z into positionMap_, so adjustZDrivesHook() would fall
+         // back to re-reading the live Z on every BEFORE_Z_DRIVE_HOOK call - re-anchoring
+         // each slice to the current Z instead of a stable autofocus reference.
+         PositionList dummyPosList = new PositionList();
+         MultiStagePosition msp = new MultiStagePosition();
+         String zDevice = core_.getFocusDevice();
+         if (zDevice != null && !zDevice.isEmpty()) {
+            msp.add(StagePosition.create1D(zDevice, core_.getPosition(zDevice)));
+         }
+         dummyPosList.addPosition(msp);
+         positions = MDAAcqEventModules.positions(dummyPosList, tag, core_);
+         // update acquisition settings to include the (synthetic) position
+         acquisitionSettings = acquisitionSettings.copyBuilder().usePositionList(true).build();
       }
 
       ArrayList<Function<AcquisitionEvent, Iterator<AcquisitionEvent>>> acqFunctions =
@@ -842,6 +869,40 @@ public class MultiAcqEngJAdapter extends AcqEngJAdapter {
    public long getNextWakeTime() {
       // TODO What to do if next wake time undefined?
       return nextWakeTime_;
+   }
+
+   /**
+    * Hook that updates nextWakeTime_ at the start of each new time point, so the
+    * "Next frame in xxx sec" alert (MMAcquisition.setNextImageAlert) can show a sensible
+    * countdown. Mirrors AcqEngJAdapter.updateNextWakeHook.
+    *
+    * @param sequenceSettings Settings providing the time-lapse interval.
+    * @return The Hook.
+    */
+   private AcquisitionHook updateNextWakeHook(SequenceSettings sequenceSettings) {
+      return new AcquisitionHook() {
+         @Override
+         public AcquisitionEvent run(AcquisitionEvent event) {
+            if (event.getMinimumStartTimeAbsolute() != null) {
+               int frameIndex = event.getTIndex() == null ? 0 : event.getTIndex();
+               if (event.getSequence() != null && event.getSequence().get(0) != null) {
+                  frameIndex = event.getSequence().get(0).getTIndex();
+               }
+               if (frameIndex > lastFrameIndex_) {
+                  lastFrameIndex_ = frameIndex;
+                  // Note that nanoTime() and currentTimeMillis() are not guaranteed to have
+                  // the same offset (0).
+                  nextWakeTime_ = System.nanoTime() / 1000000L
+                           + (long) (sequenceSettings.intervalMs());
+               }
+            }
+            return event;
+         }
+
+         @Override
+         public void close() {
+         }
+      };
    }
 
 
