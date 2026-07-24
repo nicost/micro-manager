@@ -104,6 +104,7 @@ public class MultiAcqEngJAdapter extends AcqEngJAdapter {
    private boolean autofocusOn_;
 
    private long nextWakeTime_ = -1;
+   private long lastFrameIndex_ = -1;
 
    private ArrayList<RunnablePlusIndices> runnables_ = new ArrayList<>();
 
@@ -259,6 +260,10 @@ public class MultiAcqEngJAdapter extends AcqEngJAdapter {
 
          zStage_ = core_.getFocusDevice();
          zStart_ = core_.getPosition(zStage_);
+         // Initialize positionMap_ (declared in the base AcqEngJAdapter). The inherited
+         // autofocusHook() writes into it and would NPE if it were left null (the base
+         // runAcquisition() that normally initializes it is overridden here).
+         positionMap_ = new HashMap<>();
          autofocusMethod_ = studio_.getAutofocusManager().getAutofocusMethod();
          autofocusOn_ = false;
          if (autofocusMethod_ != null) {
@@ -271,10 +276,25 @@ public class MultiAcqEngJAdapter extends AcqEngJAdapter {
                   sequenceSettings.get(i)));
          }
 
-         // These hooks implement Autofocus
+         // These hooks implement Autofocus.  Mirror the single-MDA path
+         // (AcqEngJAdapter.runAcquisition): autofocus must run at BEFORE_Z_DRIVE_HOOK
+         // (after XY/other stages are set, but before the Z drive moves for the stack),
+         // and adjustZDrivesHook rewrites the event's Z to the autofocused position so
+         // the Z drive is not sent to the raw (absolute) zStack origin.
          if (basicSettings.useAutofocus()) {
             currentMultiMDA_.addHook(autofocusHook(basicSettings.skipAutofocusCount()),
-                  AcquisitionAPI.BEFORE_HARDWARE_HOOK);
+                  AcquisitionAPI.BEFORE_Z_DRIVE_HOOK);
+            currentMultiMDA_.addHook(adjustZDrivesHook(),
+                  AcquisitionAPI.BEFORE_Z_DRIVE_HOOK);
+         }
+
+         // Hook to update the time of the next wake-up call, so that the "Next frame in
+         // xxx sec" alert shows a sensible countdown. Without this, getNextWakeTime()
+         // returns its initial -1 and the alert shows a large negative number.
+         if (timeLapseSettings_.useFrames()) {
+            lastFrameIndex_ = -1;
+            currentMultiMDA_.addHook(updateNextWakeHook(timeLapseSettings_),
+                  AcquisitionAPI.AFTER_HARDWARE_HOOK);
          }
 
          for (int i = 0; i < sequenceSettings.size(); i++) {
@@ -407,6 +427,35 @@ public class MultiAcqEngJAdapter extends AcqEngJAdapter {
                posList,
                chSpecs,
                tag);
+      } else if (((acquisitionSettings.useChannels() && !chSpecs.isEmpty())
+               || timeLapseSettings_.useAutofocus())
+               && !studio_.core().getFocusDevice().isEmpty()) {
+         // Mirror the single-MDA path (AcqEngJAdapter.createAcqEventIterator): when there
+         // is no Z stack but channels and/or autofocus are used, add a "fake" single-slice
+         // Z stack anchored at the CURRENT focus position (relative slice at 0.0). Without
+         // this, MDAAcqEventModules.channels sets the event's Z coordinate to the absolute
+         // zOffset (0.0 when there are no offsets), which drives the focus drive to 0.
+         PositionList posList = null;
+         if (acquisitionSettings.usePositionList()
+                  && AcqEngJUtils.posListHasZDrive(studio_, positionList)) {
+            posList = positionList;
+         }
+         ArrayList<Double> slices = new ArrayList<>();
+         slices.add(0.0);
+         acquisitionSettings = acquisitionSettings.copyBuilder()
+                                                  .useSlices(true)
+                                                  .slices(slices)
+                                                  .relativeZSlice(true)
+                                                  .sliceZBottomUm(0.0)
+                                                  .sliceZTopUm(0.0)
+                                                  .sliceZStepUm(0.0)
+                                                  .zReference(0.0).build();
+         zStack = MDAAcqEventModules.zStack(
+               acquisitionSettings,
+               studio_.core().getPosition(),
+               posList,
+               chSpecs,
+               tag);
       }
 
       Function<AcquisitionEvent, Iterator<AcquisitionEvent>> channels = null;
@@ -421,6 +470,23 @@ public class MultiAcqEngJAdapter extends AcqEngJAdapter {
       Function<AcquisitionEvent, Iterator<AcquisitionEvent>> positions = null;
       if (acquisitionSettings.usePositionList()) {
          positions = MDAAcqEventModules.positions(positionList, tag, core_);
+      } else if (timeLapseSettings_.useAutofocus()) {
+         // No position list, but autofocus is on. Mirror the single-MDA path
+         // (AcqEngJAdapter.createAcqEventIterator): synthesize a single dummy position so
+         // every event carries a POS_NAME tag. Without POS_NAME, autofocusHook() cannot
+         // record the autofocused Z into positionMap_, so adjustZDrivesHook() would fall
+         // back to re-reading the live Z on every BEFORE_Z_DRIVE_HOOK call - re-anchoring
+         // each slice to the current Z instead of a stable autofocus reference.
+         PositionList dummyPosList = new PositionList();
+         MultiStagePosition msp = new MultiStagePosition();
+         String zDevice = core_.getFocusDevice();
+         if (zDevice != null && !zDevice.isEmpty()) {
+            msp.add(StagePosition.create1D(zDevice, core_.getPosition(zDevice)));
+         }
+         dummyPosList.addPosition(msp);
+         positions = MDAAcqEventModules.positions(dummyPosList, tag, core_);
+         // update acquisition settings to include the (synthetic) position
+         acquisitionSettings = acquisitionSettings.copyBuilder().usePositionList(true).build();
       }
 
       ArrayList<Function<AcquisitionEvent, Iterator<AcquisitionEvent>>> acqFunctions =
@@ -803,6 +869,40 @@ public class MultiAcqEngJAdapter extends AcqEngJAdapter {
    public long getNextWakeTime() {
       // TODO What to do if next wake time undefined?
       return nextWakeTime_;
+   }
+
+   /**
+    * Hook that updates nextWakeTime_ at the start of each new time point, so the
+    * "Next frame in xxx sec" alert (MMAcquisition.setNextImageAlert) can show a sensible
+    * countdown. Mirrors AcqEngJAdapter.updateNextWakeHook.
+    *
+    * @param sequenceSettings Settings providing the time-lapse interval.
+    * @return The Hook.
+    */
+   private AcquisitionHook updateNextWakeHook(SequenceSettings sequenceSettings) {
+      return new AcquisitionHook() {
+         @Override
+         public AcquisitionEvent run(AcquisitionEvent event) {
+            if (event.getMinimumStartTimeAbsolute() != null) {
+               int frameIndex = event.getTIndex() == null ? 0 : event.getTIndex();
+               if (event.getSequence() != null && event.getSequence().get(0) != null) {
+                  frameIndex = event.getSequence().get(0).getTIndex();
+               }
+               if (frameIndex > lastFrameIndex_) {
+                  lastFrameIndex_ = frameIndex;
+                  // Note that nanoTime() and currentTimeMillis() are not guaranteed to have
+                  // the same offset (0).
+                  nextWakeTime_ = System.nanoTime() / 1000000L
+                           + (long) (sequenceSettings.intervalMs());
+               }
+            }
+            return event;
+         }
+
+         @Override
+         public void close() {
+         }
+      };
    }
 
 

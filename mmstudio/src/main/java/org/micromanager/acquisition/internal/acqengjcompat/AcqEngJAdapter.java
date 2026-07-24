@@ -99,7 +99,7 @@ public class AcqEngJAdapter implements AcquisitionEngine, MMAcquistionControlCal
    private CMMCore core_;
    protected Studio studio_;
    private PositionList posList_;
-   private HashMap<String, MultiStagePosition> positionMap_;
+   protected HashMap<String, MultiStagePosition> positionMap_;
    private String zStage_;
    private SequenceSettings sequenceSettings_;
    protected JSONObject summaryMetadataJSON_;
@@ -916,40 +916,56 @@ public class AcqEngJAdapter implements AcquisitionEngine, MMAcquistionControlCal
       return new AcquisitionHook() {
          @Override
          public AcquisitionEvent run(AcquisitionEvent event) {
-            // If we do not have previous positions, there is no point in running this code.
-            if (positionMap_.isEmpty()) {
-               return event;
-            }
             String posName = event.getTags().get(AcqEngMetadata.POS_NAME);
             String zDevice = core_.getFocusDevice();
-            if (posName != null) {
-               MultiStagePosition msp = positionMap_.get(posName);
-               if (msp != null) {
-                  for (int i = 0; i < msp.size(); i++) {
-                     StagePosition sp = msp.get(i);
-                     if (sp != null && sp.is1DStagePosition()
-                              && sp.getStageDeviceLabel().equals(zDevice)) {
-                        // here we adjust the Z position of the event
-                        // because at this point in code the event was already generated
-                        // and event.zPos has already been set using old (un-adjusted)
-                        // event's stage coordinate event.sp.get1DPosition()
-                        // hence, adjusting coordinate using setStageCoordinate
-                        // doesn't affect event's zPos
-                        studio_.core().logMessage("Adjusting Z position for event; current zPos = "
-                                + event.getZPosition() + ", current stage single axis position = "
-                                + event.getStageSingleAxisStagePosition(sp.getStageDeviceLabel())
-                                + ", new stage position = " + sp.get1DPosition());
-                        event.setZ(event.getZIndex(),
-                              event.getZPosition()
-                              - event.getStageSingleAxisStagePosition(sp.getStageDeviceLabel())
-                              + sp.get1DPosition()
-                           );
-                        event.setStageCoordinate(sp.getStageDeviceLabel(), sp.get1DPosition());
-                     }
+            MultiStagePosition msp = posName == null ? null : positionMap_.get(posName);
+            boolean adjusted = false;
+            if (msp != null) {
+               for (int i = 0; i < msp.size(); i++) {
+                  StagePosition sp = msp.get(i);
+                  if (sp != null && sp.is1DStagePosition()
+                           && sp.getStageDeviceLabel().equals(zDevice)) {
+                     // here we adjust the Z position of the event
+                     // because at this point in code the event was already generated
+                     // and event.zPos has already been set using old (un-adjusted)
+                     // event's stage coordinate event.sp.get1DPosition()
+                     // hence, adjusting coordinate using setStageCoordinate
+                     // doesn't affect event's zPos
+                     studio_.core().logMessage("Adjusting Z position for event; current zPos = "
+                             + event.getZPosition() + ", current stage single axis position = "
+                             + event.getStageSingleAxisStagePosition(sp.getStageDeviceLabel())
+                             + ", new stage position = " + sp.get1DPosition());
+                     event.setZ(event.getZIndex(),
+                           event.getZPosition()
+                           - event.getStageSingleAxisStagePosition(sp.getStageDeviceLabel())
+                           + sp.get1DPosition()
+                        );
+                     event.setStageCoordinate(sp.getStageDeviceLabel(), sp.get1DPosition());
+                     adjusted = true;
                   }
                }
-            } else { // we dont have positions, AF just moved stage but didn't update poslist
-                  
+            }
+            // No recorded (autofocused) Z for this location - e.g. autofocus failed/timed
+            // out, or this is the first visit before any autofocus recorded a position. In
+            // that case the event may carry a raw absolute Z origin (0) that would drive the
+            // focus drive to 0 and ruin the experiment. Instead, leave Z where it is: pin the
+            // event's Z to the current focus position so no absolute Z move is issued.
+            if (!adjusted && zDevice != null && !zDevice.isEmpty()
+                     && event.getZPosition() != null) {
+               try {
+                  double currentZ = core_.getPosition(zDevice);
+                  Double eventStageZ = event.getStageSingleAxisStagePosition(zDevice);
+                  double newZPos = eventStageZ == null
+                        ? currentZ
+                        : event.getZPosition() - eventStageZ + currentZ;
+                  studio_.core().logMessage("No recorded autofocus position for event; "
+                        + "pinning Z to current position " + currentZ
+                        + " (was zPos = " + event.getZPosition() + ")");
+                  event.setZ(event.getZIndex(), newZPos);
+                  event.setStageCoordinate(zDevice, currentZ);
+               } catch (Exception ex) {
+                  studio_.logs().logError(ex, "Failed to pin Z to current position");
+               }
             }
             return event;
          }
