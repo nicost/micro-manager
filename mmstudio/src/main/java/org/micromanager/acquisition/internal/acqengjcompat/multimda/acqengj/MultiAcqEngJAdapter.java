@@ -259,6 +259,10 @@ public class MultiAcqEngJAdapter extends AcqEngJAdapter {
 
          zStage_ = core_.getFocusDevice();
          zStart_ = core_.getPosition(zStage_);
+         // Initialize positionMap_ (declared in the base AcqEngJAdapter). The inherited
+         // autofocusHook() writes into it and would NPE if it were left null (the base
+         // runAcquisition() that normally initializes it is overridden here).
+         positionMap_ = new HashMap<>();
          autofocusMethod_ = studio_.getAutofocusManager().getAutofocusMethod();
          autofocusOn_ = false;
          if (autofocusMethod_ != null) {
@@ -271,10 +275,16 @@ public class MultiAcqEngJAdapter extends AcqEngJAdapter {
                   sequenceSettings.get(i)));
          }
 
-         // These hooks implement Autofocus
+         // These hooks implement Autofocus.  Mirror the single-MDA path
+         // (AcqEngJAdapter.runAcquisition): autofocus must run at BEFORE_Z_DRIVE_HOOK
+         // (after XY/other stages are set, but before the Z drive moves for the stack),
+         // and adjustZDrivesHook rewrites the event's Z to the autofocused position so
+         // the Z drive is not sent to the raw (absolute) zStack origin.
          if (basicSettings.useAutofocus()) {
             currentMultiMDA_.addHook(autofocusHook(basicSettings.skipAutofocusCount()),
-                  AcquisitionAPI.BEFORE_HARDWARE_HOOK);
+                  AcquisitionAPI.BEFORE_Z_DRIVE_HOOK);
+            currentMultiMDA_.addHook(adjustZDrivesHook(),
+                  AcquisitionAPI.BEFORE_Z_DRIVE_HOOK);
          }
 
          for (int i = 0; i < sequenceSettings.size(); i++) {
@@ -404,6 +414,35 @@ public class MultiAcqEngJAdapter extends AcqEngJAdapter {
          zStack = MDAAcqEventModules.zStack(
                acquisitionSettings,
                origin,
+               posList,
+               chSpecs,
+               tag);
+      } else if (((acquisitionSettings.useChannels() && !chSpecs.isEmpty())
+               || timeLapseSettings_.useAutofocus())
+               && !studio_.core().getFocusDevice().isEmpty()) {
+         // Mirror the single-MDA path (AcqEngJAdapter.createAcqEventIterator): when there
+         // is no Z stack but channels and/or autofocus are used, add a "fake" single-slice
+         // Z stack anchored at the CURRENT focus position (relative slice at 0.0). Without
+         // this, MDAAcqEventModules.channels sets the event's Z coordinate to the absolute
+         // zOffset (0.0 when there are no offsets), which drives the focus drive to 0.
+         PositionList posList = null;
+         if (acquisitionSettings.usePositionList()
+                  && AcqEngJUtils.posListHasZDrive(studio_, positionList)) {
+            posList = positionList;
+         }
+         ArrayList<Double> slices = new ArrayList<>();
+         slices.add(0.0);
+         acquisitionSettings = acquisitionSettings.copyBuilder()
+                                                  .useSlices(true)
+                                                  .slices(slices)
+                                                  .relativeZSlice(true)
+                                                  .sliceZBottomUm(0.0)
+                                                  .sliceZTopUm(0.0)
+                                                  .sliceZStepUm(0.0)
+                                                  .zReference(0.0).build();
+         zStack = MDAAcqEventModules.zStack(
+               acquisitionSettings,
+               studio_.core().getPosition(),
                posList,
                chSpecs,
                tag);
