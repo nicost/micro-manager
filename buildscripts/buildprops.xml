@@ -74,6 +74,12 @@
 			source="1.8" target="1.8" includeAntRuntime="false">
 			<compilerarg value="-Xlint:all,-path,-serial"/>
 			<compilerarg line="${mm.javacflags}"/>
+			<!-- Recent JDKs (23+) no longer auto-discover annotation processors that
+			     are merely on the compile classpath, so scijava-common's processor
+			     (which generates the META-INF/json plugin index used to find
+			     @Plugin-annotated classes) must be pointed to explicitly here. -->
+			<compilerarg value="-processorpath"/>
+			<compilerarg pathref="mm.compile.classpath"/>
 		</javac>
 	</presetdef>
 
