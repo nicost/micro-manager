@@ -21,6 +21,7 @@ import java.awt.Frame;
 import java.awt.Window;
 import java.io.File;
 import javax.swing.JFileChooser;
+import javax.swing.JOptionPane;
 import org.micromanager.ApplicationSkin;
 import org.micromanager.ApplicationSkin.SkinMode;
 import org.micromanager.UserProfile;
@@ -56,11 +57,13 @@ public final class FileDialogs {
          "Image Location", System.getProperty("user.home") + "/Untitled.tif",
          false, "tif", "jpg", "avi", "png", "jpg");
 
+   // The first suffix is the one appended when saving; "txt" is kept so that
+   // settings files written before the ".mda" suffix was introduced remain visible.
    public static final FileType ACQ_SETTINGS_FILE = new FileType(
          "ACQ_SETTINGS_FILE",
-         "Acquisition settings",
-         System.getProperty("user.home") + "/AcqSettings.txt",
-         true, "txt");
+         "Acquisition settings (*.mda, *.txt)",
+         System.getProperty("user.home") + "/AcqSettings.mda",
+         true, "mda", "txt");
 
    private static class GeneralFileFilter
          extends javax.swing.filechooser.FileFilter
@@ -77,7 +80,9 @@ public final class FileDialogs {
       public boolean accept(File pathname) {
          String name = pathname.getName();
          int n = name.lastIndexOf(".");
-         String suffix = name.substring(1 + n).toLowerCase();
+         // A name without a dot has no suffix at all; substring(1 + n) would
+         // otherwise return the whole name and match a file literally named "txt".
+         String suffix = n < 0 ? "" : name.substring(n + 1).toLowerCase();
          if (fileSuffixes_ == null || fileSuffixes_.length == 0) {
             return true;
          }
@@ -101,6 +106,61 @@ public final class FileDialogs {
       public String getDescription() {
          return fileDescription_;
       }
+   }
+
+   /**
+    * Appends the file type's primary suffix to a file selected for saving when the
+    * name the user typed does not already carry one of the accepted suffixes.
+    *
+    * <p>Neither AWT's FileDialog nor Swing's JFileChooser does this for us: a
+    * FileFilter only decides which files are listed, never how a new one is named.
+    * Without this, saving as "AcqSettings7" produces an extension-less file that
+    * the very same filter then hides when loading.
+    *
+    * @param selectedFile file the user chose, may be null.
+    * @param fileSuffixes accepted suffixes; the first is the one appended.
+    * @return the file with a suffix appended if one was needed.
+    */
+   private static File ensureSuffix(File selectedFile, final String[] fileSuffixes) {
+      if (selectedFile == null || fileSuffixes == null || fileSuffixes.length == 0
+            || fileSuffixes[0] == null) {
+         return selectedFile;
+      }
+      // Compare the suffix directly rather than calling filter.accept(): that
+      // passes any existing directory through on non-Mac so the chooser stays
+      // navigable, which would wrongly suppress the suffix here.
+      String name = selectedFile.getName();
+      int n = name.lastIndexOf(".");
+      String suffix = n < 0 ? "" : name.substring(n + 1).toLowerCase();
+      for (String s : fileSuffixes) {
+         if (s != null && s.toLowerCase().contentEquals(suffix)) {
+            return selectedFile;
+         }
+      }
+      return new File(selectedFile.getAbsolutePath() + "." + fileSuffixes[0]);
+   }
+
+   /**
+    * Asks the user before overwriting an existing file.
+    *
+    * <p>Only needed when a suffix was appended after the chooser closed: the file
+    * actually written is then not the one the chooser confirmed, so its own
+    * overwrite check does not cover the real target.
+    *
+    * @param parent parent window for the dialog.
+    * @param original file as returned by the chooser.
+    * @param withSuffix same file after a suffix may have been appended.
+    * @return withSuffix, or null if the user declined to overwrite.
+    */
+   private static File confirmOverwriteIfRenamed(Window parent, File original,
+                                                 File withSuffix) {
+      if (withSuffix == null || withSuffix.equals(original) || !withSuffix.exists()) {
+         return withSuffix;
+      }
+      int answer = JOptionPane.showConfirmDialog(parent,
+            withSuffix.getName() + " already exists.\nDo you want to replace it?",
+            "Confirm Save As", JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE);
+      return answer == JOptionPane.YES_OPTION ? withSuffix : null;
    }
 
    public static File promptForFile(Window parent,
@@ -148,10 +208,9 @@ public final class FileDialogs {
          if (fd.getFile() != null) {
             selectedFile = new File(fd.getDirectory() + "/" + fd.getFile());
             if (mode == FileDialog.SAVE) {
-               if (!filter.accept(selectedFile)) {
-                  selectedFile = new File(selectedFile.getAbsolutePath()
-                        + "." + fileSuffixes[0]);
-               }
+               File original = selectedFile;
+               selectedFile = ensureSuffix(selectedFile, fileSuffixes);
+               selectedFile = confirmOverwriteIfRenamed(parent, original, selectedFile);
             }
          }
          fd.dispose();
@@ -188,6 +247,11 @@ public final class FileDialogs {
          }
          if (returnVal == JFileChooser.APPROVE_OPTION) {
             selectedFile = fc.getSelectedFile();
+            if (!load && !selectDirectories) {
+               File original = selectedFile;
+               selectedFile = ensureSuffix(selectedFile, fileSuffixes);
+               selectedFile = confirmOverwriteIfRenamed(parent, original, selectedFile);
+            }
          }
       }
       return selectedFile;
